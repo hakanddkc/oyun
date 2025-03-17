@@ -1,4 +1,4 @@
-import pygame, random
+import pygame, random, sqlite3
 from spaceship import Spaceship
 from obstacle import Obstacle
 from obstacle import grid
@@ -7,26 +7,52 @@ from laser import Laser
 from alien import MysteryShip
 from powerup import PowerUp  # Yeni: PowerUp sınıfı
 
-# Coin işlemleri için fonksiyonlar
-def load_coins_from_file():
-    try:
-        with open("coins.txt", "r") as file:
-            return int(file.read().strip())
-    except Exception:
-        return 500  # Varsayılan başlangıç parası
+def load_coins_from_db(user_id):
+    """Veritabanından ilgili kullanıcının coin değerini çeker."""
+    conn = sqlite3.connect("game_data.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT coins FROM users WHERE id=?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result is not None else 0
 
-def save_coins_to_file(coins):
-    with open("coins.txt", "w") as file:
-        file.write(str(coins))
+def update_coins_in_db(user_id, coins):
+    """Veritabanındaki ilgili kullanıcının coin değerini günceller."""
+    conn = sqlite3.connect("game_data.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET coins=? WHERE id=?", (coins, user_id))
+    conn.commit()
+    conn.close()
 
 class Game:
-    def __init__(self, screen_width, screen_height, offset, level=1):
+    def __init__(
+        self,
+        screen_width,
+        screen_height,
+        offset,
+        level=1,
+        user_id=1,
+        spaceship_image_path=None  # YENİ: Gemi resmi parametresi
+    ):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.offset = offset
-        self.level = level  # Seçilen level burada saklanır.
+        self.level = level  # Seçilen level
+        self.user_id = user_id  # Kullanıcı ID'si
+
+        # Eğer None geldiyse varsayılan resim kullan
+        if spaceship_image_path is None:
+            spaceship_image_path = "Graphics/default_spaceship.png"
+
+        # Spaceship grubunu oluştur; Spaceship constructoruna yeni parametre ekliyoruz
         self.spaceship_group = pygame.sprite.GroupSingle()
-        self.spaceship_group.add(Spaceship(self.screen_width, self.screen_height, self.offset))
+        self.spaceship_group.add(Spaceship(
+            self.screen_width,
+            self.screen_height,
+            self.offset,
+            spaceship_image_path=spaceship_image_path  # Bunu spaceship'e ilet
+        ))
+
         self.obstacles = self.create_obstacles()
         self.aliens_group = pygame.sprite.Group()
         self.create_aliens()
@@ -37,10 +63,12 @@ class Game:
         self.run = True
         self.score = 0
         self.highscore = 0
-        # Coin değeri artık sabit 500 yerine, dosyadan yükleniyor.
-        self.coins = load_coins_from_file()
+        # Coin değeri artık veritabanından çekiliyor
+        self.coins = load_coins_from_db(self.user_id)
+
         self.explosion_sound = pygame.mixer.Sound("Sounds/explosion.ogg")
         self.load_highscore()
+
         pygame.mixer.music.load("Sounds/music.ogg")
         pygame.mixer.music.play(-1)
 
@@ -49,7 +77,7 @@ class Game:
         self.has_shield = False
         self.has_double_shot = False
         self.powerup_timer = 0
-        self.powerup_duration = 600  # Yaklaşık 10 saniye (60 FPS'de 600 frame)
+        self.powerup_duration = 600  # 10 sn civarı (60 FPS'de 600 frame)
 
     def create_obstacles(self):
         obstacle_width = len(grid[0]) * 3
@@ -62,8 +90,8 @@ class Game:
         return obstacles
 
     def create_aliens(self):
-        # Seviye arttıkça alien satır sayısı artar:
-        rows = 5 + (self.level - 1)  # Level 1: 5 satır, Level 2: 6 satır, vb.
+        # Seviye arttıkça satır sayısı artar
+        rows = 5 + (self.level - 1)
         columns = 11
         for row in range(rows):
             for column in range(columns):
@@ -102,13 +130,12 @@ class Game:
         self.mystery_ship_group.add(MysteryShip(self.screen_width, self.offset))
 
     def create_powerup(self):
-        # Rastgele "shield" veya "double_shot" güçlendirmesi oluştur
         power_type = random.choice(["shield", "double_shot"])
         powerup_sprite = PowerUp(self.screen_width, self.screen_height, self.offset, power_type)
         self.powerups_group.add(powerup_sprite)
 
     def check_for_collisions(self):
-        # Spaceship Laser'ları: Uzay gemisinin ateşi
+        # Spaceship Laser'ları
         if self.spaceship_group.sprite.lasers_group:
             for laser_sprite in self.spaceship_group.sprite.lasers_group:
                 aliens_hit = pygame.sprite.spritecollide(laser_sprite, self.aliens_group, True)
@@ -117,16 +144,21 @@ class Game:
                     for alien in aliens_hit:
                         self.score += alien.type * 100
                         self.check_for_highscore()
-                        # Her düşman öldürünce, alien türüne göre coin ekle (örneğin: tür * 20)
+                        # Her öldürdüğünde coin kazan
                         self.coins += alien.type * 20
+                        update_coins_in_db(self.user_id, self.coins)
                         laser_sprite.kill()
+
+                # MysteryShip
                 if pygame.sprite.spritecollide(laser_sprite, self.mystery_ship_group, True):
                     self.score += 500
                     self.explosion_sound.play()
                     self.check_for_highscore()
-                    self.coins += 100  # Mystery ship vurulduğunda 100 coin
+                    self.coins += 100
+                    update_coins_in_db(self.user_id, self.coins)
                     laser_sprite.kill()
-                # PowerUp çarpışması
+
+                # PowerUp
                 powerups_hit = pygame.sprite.spritecollide(laser_sprite, self.powerups_group, True)
                 if powerups_hit:
                     laser_sprite.kill()
@@ -137,11 +169,13 @@ class Game:
                         elif pu.power_type == "double_shot":
                             self.has_double_shot = True
                             self.powerup_timer = self.powerup_duration
+
+                # Obstacles
                 for obstacle in self.obstacles:
                     if pygame.sprite.spritecollide(laser_sprite, obstacle.blocks_group, True):
                         laser_sprite.kill()
 
-        # Alien Laser'ları: Düşman ateşi
+        # Alien Laser'ları
         if self.alien_lasers_group:
             for laser_sprite in self.alien_lasers_group:
                 if pygame.sprite.spritecollide(laser_sprite, self.spaceship_group, False):
@@ -153,11 +187,12 @@ class Game:
                     else:
                         self.has_shield = False
                         self.powerup_timer = 0
+                # Obstacles
                 for obstacle in self.obstacles:
                     if pygame.sprite.spritecollide(laser_sprite, obstacle.blocks_group, True):
                         laser_sprite.kill()
 
-        # Alien'ler: Uzay gemisine temas ederse
+        # Alien - Spaceship teması
         if self.aliens_group:
             for alien in self.aliens_group:
                 for obstacle in self.obstacles:
@@ -193,7 +228,7 @@ class Game:
         self.mystery_ship_group.empty()
         self.obstacles = self.create_obstacles()
         self.score = 0
-        # self.coins burada resetlenmiyor; mevcut coin değeri korunuyor.
+        # Coin resetlenmiyor, bakiye korunuyor
         self.has_shield = False
         self.has_double_shot = False
         self.powerup_timer = 0
@@ -202,7 +237,7 @@ class Game:
     def next_level(self):
         self.level += 1
         self.run = True
-        self.lives = 3  # Yeni levelde can sıfırlansın
+        self.lives = 3
         self.aliens_group.empty()
         self.alien_lasers_group.empty()
         self.mystery_ship_group.empty()
