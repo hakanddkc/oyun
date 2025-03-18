@@ -134,7 +134,7 @@ def get_equipped_ship_path(user_id):
 def show_login_window(master):
     login_win = tk.Toplevel(master)
     login_win.title("Giriş Yap")
-    login_win.geometry("400x250")
+    login_win.geometry("700x500")
     login_win.configure(bg="black")
 
     tk.Label(login_win, text="Kullanıcı Adı:", fg="yellow", bg="black", font=("Arial", 12)).pack(pady=5)
@@ -167,7 +167,7 @@ def show_login_window(master):
 def show_register_window(master):
     reg_win = tk.Toplevel(master)
     reg_win.title("Kayıt Ol")
-    reg_win.geometry("400x300")
+    reg_win.geometry("700x500")
     reg_win.configure(bg="black")
 
     tk.Label(reg_win, text="Kullanıcı Adı:", fg="yellow", bg="black", font=("Arial", 12)).pack(pady=5)
@@ -225,7 +225,7 @@ def register_user(username, password):
 # -----------------------------------------------------
 def show_main_menu_welcome(username, user_id):
     root.deiconify()
-    root.geometry("600x400")
+    root.geometry("700x500")
     for widget in root.winfo_children():
         widget.destroy()
     root.configure(bg="black")
@@ -266,7 +266,7 @@ def show_main_menu_welcome(username, user_id):
 def show_profile():
     profile_win = tk.Toplevel(root)
     profile_win.title("Profil")
-    profile_win.geometry("500x400")
+    profile_win.geometry("700x500")
     profile_win.configure(bg="black")
     label = tk.Label(profile_win, text="Profil (Placeholder)", font=("Arial", 16), fg="yellow", bg="black")
     label.pack(pady=20)
@@ -274,7 +274,7 @@ def show_profile():
 def show_scoreboard():
     scoreboard_win = tk.Toplevel(root)
     scoreboard_win.title("Skor Tablosu")
-    scoreboard_win.geometry("500x400")
+    scoreboard_win.geometry("700x500")
     scoreboard_win.configure(bg="black")
     label = tk.Label(scoreboard_win, text="Skor Tablosu (Placeholder)", font=("Arial", 16), fg="yellow", bg="black")
     label.pack(pady=20)
@@ -287,7 +287,7 @@ def show_market(master, user_id):
         print("Market modülü bulunamadı:", e)
         market_win = tk.Toplevel(master)
         market_win.title("Market")
-        market_win.geometry("600x500")
+        market_win.geometry("700x500")
         market_win.configure(bg="black")
         label = tk.Label(market_win, text="Market (Placeholder)", font=("Arial", 16), fg="yellow", bg="black")
         label.pack(pady=20)
@@ -298,7 +298,7 @@ def show_market(master, user_id):
 def show_level_selection(user_id, username):
     level_win = tk.Toplevel(root)
     level_win.title("Seviye Seç")
-    level_win.geometry("600x500")
+    level_win.geometry("700x500")
     level_win.configure(bg="black")
 
     title_label = tk.Label(level_win, text="LEVEL SEÇ", font=("Arial", 18, "bold"), fg="yellow", bg="black")
@@ -603,7 +603,7 @@ def show_main_menu():
     # Eski menü fonksiyonu, isterseniz silebilirsiniz.
     menu_win = tk.Toplevel(root)
     menu_win.title("Ana Menü")
-    menu_win.geometry("700x600")
+    menu_win.geometry("700x500")
     menu_win.configure(bg="black")
 
     title_label = tk.Label(menu_win, text="ANA MENÜ", font=("Arial", 18, "bold"), fg="yellow", bg="black")
@@ -631,7 +631,7 @@ def show_main_menu():
 def main():
     init_user_db()
     root.title("Giriş / Kayıt")
-    root.geometry("400x250")
+    root.geometry("700x500")
     root.configure(bg="black")
 
     info_label = tk.Label(root, text="Lütfen giriş yapın ya da kayıt olun.",

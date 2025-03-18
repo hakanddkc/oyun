@@ -28,9 +28,12 @@ class Spaceship(pygame.sprite.Sprite):
     def get_user_input(self):
         keys = pygame.key.get_pressed()
 
-        if keys[pygame.K_RIGHT]:
+        # Sağ ok tuşu veya D tuşu ile sağa hareket
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.rect.x += self.speed
-        if keys[pygame.K_LEFT]:
+
+        # Sol ok tuşu veya A tuşu ile sola hareket
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.rect.x -= self.speed
 
         # Ateş (Space)

@@ -41,15 +41,23 @@ def init_ships_and_user_ships_db():
     cursor.execute("SELECT COUNT(*) FROM ships")
     count = cursor.fetchone()[0]
     if count == 0:
-        # Örnek gemiler: Level 4 -> anagemi.png ekleniyor
         sample_data = [
-            (1, 100, "Graphics/gemi111.PNG"),
-            (1, 100, "Graphics/gemi21.PNG"),
-            (2, 200, "Graphics/gemi12.PNG"),
-            (2, 200, "Graphics/gemi22.PNG"),
-            (3, 300, "Graphics/gemi13.PNG"),
-            (3, 300, "Graphics/gemi23.PNG"),
-            (4, 400, "Graphics/anagemi.png")  # DİKKAT: Yeni gemi
+            (1, 100, "Graphics/blue_1.png"),
+            (1, 200, "Graphics/blue_2.png"),
+            (1, 300, "Graphics/blue_3.png"),
+            (2, 100, "Graphics/darkgrey_1.png"),
+            (2, 200, "Graphics/darkgrey_2.png"),
+            (2, 300, "Graphics/darkgrey_3.png"),
+            (3, 200, "Graphics/green_1.png"),
+            (3, 300, "Graphics/green_2.png"),
+            (3, 400, "Graphics/green_3.png"),
+            (4, 200, "Graphics/greyblue_1.png"),
+            (4, 300, "Graphics/greyblue_2.png"),
+            (4, 400, "Graphics/greyblue_3.png"),
+            (5, 300, "Graphics/seagreen_1.png"),
+            (5, 400, "Graphics/seagreen_2.png"),
+            (5, 500, "Graphics/seagreen_3.png"),
+            # DİKKAT: Yeni gemi
         ]
         for (lvl, price, path) in sample_data:
             cursor.execute("""
