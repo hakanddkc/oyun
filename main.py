@@ -2,9 +2,9 @@ import sqlite3
 import tkinter as tk
 from tkinter import messagebox
 import pygame, sys, random
-from game import Game          # game.py içindeki Game sınıfınız
+from game import Game  # game.py içindeki Game sınıfınız
 from profil import show_profile  # Profil ekranı fonksiyonunu profil.py'den import ettik
-import scoretable              # Skor tablosu için modül
+import scoretable  # Skor tablosu için modül
 
 # Renk tanımları
 GREY = (50, 50, 50)
@@ -37,6 +37,7 @@ def init_user_db():
     """)
     conn.commit()
     conn.close()
+
 
 def register_user_db(username, password):
     conn = sqlite3.connect("game_data.db")
@@ -485,6 +486,22 @@ def start_game(selected_level, win, user_id, username):
     pygame.quit()
     root.deiconify()
     show_main_menu_welcome(username, user_id)
+
+def create_mute_button(self, game):
+    """Mute butonunu ekranın sağ üst kısmına yerleştirir"""
+    mute_button_rect = pygame.Rect(self.screen_width - 60, 10, 50, 50)  # Sağ üst köşe
+
+    # Mute butonu resmini değiştir
+    speaker_icon = pygame.image.load("Graphics/volume-up.png" if not game.muted else "Graphics/volume-mute.png")
+    speaker_icon = pygame.transform.scale(speaker_icon, (40, 40))  # Boyutlandırma
+    self.screen.blit(speaker_icon, mute_button_rect)
+
+    # Butona tıklama olayını kontrol et
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    if mute_button_rect.collidepoint(mouse_x, mouse_y):
+        if pygame.mouse.get_pressed()[0]:  # Sol tıklama
+            game.toggle_music()  # Ses durumu değiştir
+
 
 def show_main_menu():
     menu_win = tk.Toplevel(root)

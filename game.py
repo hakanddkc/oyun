@@ -51,23 +51,26 @@ class Game:
         user_id=1,
         spaceship_image_path=None  # YENİ: Gemi resmi parametresi
     ):
+        self.muted = False  # Başlangıçta ses açık
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.offset = offset
         self.level = level  # Seçilen level
         self.user_id = user_id  # Kullanıcı ID'si
 
+        # Pygame ekranını başlatma
+        pygame.display.init()  # Pygame ekranını başlatıyoruz
+
         # Eğer None geldiyse varsayılan resim kullan
         if spaceship_image_path is None:
-            spaceship_image_path = "Graphics/default_spaceship.png"
+            spaceship_image_path = "Graphics/spaceship.png"
 
-        # Spaceship grubunu oluştur; Spaceship constructoruna yeni parametre ekliyoruz
+        # Spaceship grubunu oluştur; Spaceship constructorına yeni parametre ekliyoruz
         self.spaceship_group = pygame.sprite.GroupSingle()
-        self.spaceship_group.add(Spaceship(
-            self.screen_width,
-            self.screen_height,
-            self.offset,
-            spaceship_image_path=spaceship_image_path  # Bunu spaceship'e ilet
+        self.spaceship_group.add(Spaceship(self.screen_width,
+        self.screen_height,
+        self.offset,
+        spaceship_image_path=spaceship_image_path # Bunu spaceship'e ilet
         ))
 
         self.obstacles = self.create_obstacles()
@@ -95,6 +98,35 @@ class Game:
         self.has_double_shot = False
         self.powerup_timer = 0
         self.powerup_duration = 600  # 10 sn civarı (60 FPS'de 600 frame)
+
+    def toggle_music(self):
+        """Ses açma/kapama fonksiyonu"""
+        if self.muted:
+            pygame.mixer.music.unpause()  # Müziği tekrar başlat
+            self.muted = False
+        else:
+            pygame.mixer.music.pause()  # Müziği durdur
+            self.muted = True
+
+    def update_screen(self):
+        """Ekran her güncellenmesinde ses kontrol butonunu ekle"""
+        self.create_mute_button()  # Mute butonunu ekle
+        pygame.display.update()
+
+    def create_mute_button(self):
+        """Mute butonunu ekranın sağ üst köşesine yerleştirir"""
+        mute_button_rect = pygame.Rect(self.screen_width - 110, 10, 50, 50)  # Sağ üst köşe, pause butonunun yanına
+
+        # Mute butonu resmini değiştir
+        speaker_icon = pygame.image.load("Graphics/volume-up.png" if not self.muted else "Graphics/volume-mute.png")
+        speaker_icon = pygame.transform.scale(speaker_icon, (40, 40))  # Boyutlandırma
+        self.screen.blit(speaker_icon, mute_button_rect)
+
+        # Butona tıklama olayını kontrol et
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        if mute_button_rect.collidepoint(mouse_x, mouse_y):
+            if pygame.mouse.get_pressed()[0]:  # Sol tıklama
+                self.toggle_music()  # Ses durumu değiştir
 
     def create_obstacles(self):
         obstacle_width = len(grid[0]) * 3
