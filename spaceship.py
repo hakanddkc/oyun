@@ -5,8 +5,8 @@ class Spaceship(pygame.sprite.Sprite):
     def __init__(self, screen_width, screen_height, offset, spaceship_image_path="Graphics/spaceship.png"):
         super().__init__()
         self.offset = offset
-        self.screen_width = screen_width
-        self.screen_height = screen_height
+        self.screen_width = 750
+        self.screen_height = 700
 
         # 1) Gemi resmini yükle
         raw_image = pygame.image.load(spaceship_image_path).convert_alpha()
@@ -18,7 +18,7 @@ class Spaceship(pygame.sprite.Sprite):
         # 3) Yeni self.image'e göre rect ayarlayalım
         self.rect = self.image.get_rect(midbottom=((self.screen_width + self.offset)//2, self.screen_height))
 
-        self.speed = 6
+        self.speed = 8
         self.lasers_group = pygame.sprite.Group()
         self.laser_ready = True
         self.laser_time = 0

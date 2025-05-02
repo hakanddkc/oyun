@@ -16,11 +16,28 @@ def load_coins_from_db(user_id):
     conn.close()
     return result[0] if result is not None else 0
 
+def load_highscore_from_db(user_id):
+    """Veritabanından ilgili kullanıcının en yüksek skorunu çeker."""
+    conn = sqlite3.connect("game_data.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(score) FROM user_levels WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result is not None else 0
+
 def update_coins_in_db(user_id, coins):
     """Veritabanındaki ilgili kullanıcının coin değerini günceller."""
     conn = sqlite3.connect("game_data.db")
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET coins=? WHERE id=?", (coins, user_id))
+    conn.commit()
+    conn.close()
+
+def update_score_in_db(user_id, score):
+    """Veritabanındaki ilgili kullanıcının skorunu günceller."""
+    conn = sqlite3.connect("game_data.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO user_levels (user_id, score) VALUES (?, ?)", (user_id, score))
     conn.commit()
     conn.close()
 
@@ -62,7 +79,7 @@ class Game:
         self.lives = 3  # Oyuncunun başlangıç canı
         self.run = True
         self.score = 0
-        self.highscore = 0
+        self.highscore = load_highscore_from_db(self.user_id)  # Veritabanından yüksek skoru çekiyoruz
         # Coin değeri artık veritabanından çekiliyor
         self.coins = load_coins_from_db(self.user_id)
 
@@ -85,7 +102,7 @@ class Game:
         obstacles = []
         for i in range(4):
             offset_x = (i + 1) * gap + i * obstacle_width
-            obstacle = Obstacle(offset_x, self.screen_height - 100)
+            obstacle = Obstacle(offset_x, self.screen_height - 150)
             obstacles.append(obstacle)
         return obstacles
 
@@ -216,6 +233,7 @@ class Game:
 
     def game_over(self):
         self.run = False
+        update_score_in_db(self.user_id, self.score)  # Skor veritabanına kaydediliyor
 
     def reset(self):
         self.run = True
@@ -248,12 +266,10 @@ class Game:
     def check_for_highscore(self):
         if self.score > self.highscore:
             self.highscore = self.score
-            with open("highscore.txt", "w") as file:
-                file.write(str(self.highscore))
+            update_score_in_db(self.user_id, self.score)  # Yeni en yüksek skoru veritabanına kaydet
 
     def load_highscore(self):
         try:
-            with open("highscore.txt", "r") as file:
-                self.highscore = int(file.read())
+            self.highscore = load_highscore_from_db(self.user_id)  # Kullanıcının yüksek skorunu veritabanından yükle
         except FileNotFoundError:
             self.highscore = 0
