@@ -1,21 +1,22 @@
-# scoretable.py
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+
 def show_scoretable(master):
     """
     Veritabanından her kullanıcının en yüksek skorunu çeker
-    ve bir Treeview içinde listeler.
+    ve verilen master widget içinde listeler.
     """
-    score_win = tk.Toplevel(master)
-    score_win.title("Skor Tablosu")
-    score_win.geometry("500x400")
-    score_win.configure(bg="black")
+    # Eğer master'ın içi doluysa temizle
+    for w in master.winfo_children():
+        w.destroy()
+
+    master.configure(bg="black")
 
     # Başlık
     header = tk.Label(
-        score_win,
+        master,
         text="🏆 Kullanıcıların En Yüksek Skorları 🏆",
         font=("Arial", 16, "bold"),
         fg="yellow",
@@ -26,7 +27,7 @@ def show_scoretable(master):
     # Treeview oluşturma
     columns = ("Kullanıcı", "En Yüksek Skor")
     tree = ttk.Treeview(
-        score_win,
+        master,
         columns=columns,
         show="headings",
         height=15
@@ -64,7 +65,7 @@ def show_scoretable(master):
             tree.insert("", "end", values=(username, best or 0))
 
     # Butonlar
-    btn_frame = tk.Frame(score_win, bg="black")
+    btn_frame = tk.Frame(master, bg="black")
     btn_frame.pack(pady=(5, 10))
 
     refresh_btn = tk.Button(
@@ -79,11 +80,11 @@ def show_scoretable(master):
 
     close_btn = tk.Button(
         btn_frame,
-        text="Kapat",
+        text="Geri",
         font=("Arial", 12),
         fg="black",
         bg="yellow",
-        command=score_win.destroy
+        command=lambda: master.master.show_main_menu_welcome()
     )
     close_btn.pack(side="left", padx=10)
 

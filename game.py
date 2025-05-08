@@ -42,15 +42,7 @@ def update_score_in_db(user_id, score):
     conn.close()
 
 class Game:
-    def __init__(
-        self,
-        screen_width,
-        screen_height,
-        offset,
-        level=1,
-        user_id=1,
-        spaceship_image_path=None  # YENİ: Gemi resmi parametresi
-    ):
+    def __init__(self, screen_width, screen_height, offset, level=1, user_id=1, spaceship_image_path=None):
         self.muted = False  # Başlangıçta ses açık
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -68,10 +60,9 @@ class Game:
         # Spaceship grubunu oluştur; Spaceship constructorına yeni parametre ekliyoruz
         self.spaceship_group = pygame.sprite.GroupSingle()
         self.spaceship_group.add(Spaceship(self.screen_width,
-        self.screen_height,
-        self.offset,
-        spaceship_image_path=spaceship_image_path # Bunu spaceship'e ilet
-        ))
+                                           self.screen_height,
+                                           self.offset,
+                                           spaceship_image_path=spaceship_image_path))  # Bunu spaceship'e ilet
 
         self.obstacles = self.create_obstacles()
         self.aliens_group = pygame.sprite.Group()
@@ -115,7 +106,7 @@ class Game:
 
     def create_mute_button(self):
         """Mute butonunu ekranın sağ üst köşesine yerleştirir"""
-        mute_button_rect = pygame.Rect(self.screen_width - 110, 10, 50, 50)  # Sağ üst köşe, pause butonunun yanına
+        mute_button_rect = pygame.Rect(self.screen_width - 60, 10, 50, 50)  # Sağ üst köşe
 
         # Mute butonu resmini değiştir
         speaker_icon = pygame.image.load("Graphics/volume-up.png" if not self.muted else "Graphics/volume-mute.png")

@@ -80,8 +80,8 @@ def set_user_ownership(user_id, ship_id, is_owned=1):
     conn = sqlite3.connect("game_data.db")
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT OR REPLACE INTO user_ships (user_id, ship_id, is_owned, is_equipped)"
-        " VALUES (?, ?, ?, COALESCE((SELECT is_equipped FROM user_ships WHERE user_id=? AND ship_id=?),0))",
+        "INSERT OR REPLACE INTO user_ships (user_id, ship_id, is_owned, is_equipped) "
+        "VALUES (?, ?, ?, COALESCE((SELECT is_equipped FROM user_ships WHERE user_id=? AND ship_id=?),0))",
         (user_id, ship_id, is_owned, user_id, ship_id)
     )
     conn.commit()
@@ -123,10 +123,10 @@ def buy_gemi(ship_id, price, coins_label, user_id, market_win):
     """Satın alma işlemi. Coin yeterliyse satın al ve yenile."""
     coins = load_coins_db(user_id)
     if coins >= price:
-        save_coins_db(coins-price, user_id)
+        save_coins_db(coins - price, user_id)
         set_user_ownership(user_id, ship_id, 1)
-        coins_label.config(text=f"Coins: {coins-price}")
-        messagebox.showinfo("Başarılı", f"Gemi satın alındı. Kalan coin: {coins-price}")
+        coins_label.config(text=f"Coins: {coins - price}")
+        messagebox.showinfo("Başarılı", f"Gemi satın alındı. Kalan coin: {coins - price}")
         market_win.destroy()
         show_market(market_win.master, user_id)
     else:
@@ -141,6 +141,10 @@ def select_gemi(ship_id, user_id, market_win):
     show_market(market_win.master, user_id)
 
 
+# -----------------------------------------------------
+# MARKET ARAYÜZÜ
+# -----------------------------------------------------
+
 def show_market(master, user_id=1):
     init_ships_and_user_ships_db()
 
@@ -149,16 +153,34 @@ def show_market(master, user_id=1):
     market_win.geometry("800x600")
     market_win.configure(bg="black")
 
-    # Geri butonu sol üst
-    back_btn = tk.Button(
+    # ——— Arka plan resmi ———
+    bg = ImageTk.PhotoImage(
+        Image.open("Graphics/anasayfa.png").resize((800, 600), Image.LANCZOS)
+    )
+    lbl_bg = tk.Label(market_win, image=bg)
+    lbl_bg.image = bg
+    lbl_bg.place(x=0, y=0, relwidth=1, relheight=1)
+    # ————————————————————
+
+    # ——— Sayfa Başlığı ———
+    tk.Label(
+        market_win,
+        text="Market Sayfası",
+        font=("Arial", 24, "bold"),
+        fg="yellow",
+        bg="black"
+    ).pack(pady=(20, 10))
+    # ————————————————————
+
+    # Geri butonu
+    tk.Button(
         market_win,
         text="← Geri",
         font=("Arial", 12),
         fg="black",
         bg="yellow",
         command=market_win.destroy
-    )
-    back_btn.pack(anchor="nw", padx=10, pady=10)
+    ).pack(anchor="nw", padx=10, pady=10)
 
     # Coin göstergesi
     coins = load_coins_db(user_id)
@@ -172,105 +194,73 @@ def show_market(master, user_id=1):
     coins_label.pack()
 
     # Kaydırılabilir içerik
-    main_frame = tk.Frame(market_win, bg="black")
-    main_frame.pack(fill="both", expand=True, padx=20, pady=10)
+    frame = tk.Frame(market_win, bg="black")
+    frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-    canvas = tk.Canvas(main_frame, bg="black", highlightthickness=0)
-    scrollbar = tk.Scrollbar(main_frame, orient="vertical", command=canvas.yview)
-    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas = tk.Canvas(frame, bg="black", highlightthickness=0)
+    scroll = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+    canvas.configure(yscrollcommand=scroll.set)
     canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+    scroll.pack(side="right", fill="y")
 
     content = tk.Frame(canvas, bg="black")
-    canvas.create_window((0,0), window=content, anchor="nw")
+    canvas.create_window((0, 0), window=content, anchor="nw")
     content.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 
     ships = load_ships_from_db()
-    by_level = defaultdict(list)
-    for sid, lvl, pr, ip in ships:
-        by_level[lvl].append((sid, pr, ip))
+    by_lvl = defaultdict(list)
+    for sid, lvl, price, path in ships:
+        by_lvl[lvl].append((sid, price, path))
 
-    for lvl in sorted(by_level):
-        lvl_lbl = tk.Label(
+    # Her seviye için başlık ve gemiler
+    for lvl in sorted(by_lvl):
+        tk.Label(
             content,
             text=f"Level {lvl} Gemileri",
             font=("Arial", 16, "bold"),
             fg="yellow",
             bg="black"
-        )
-        lvl_lbl.pack(pady=10, anchor="center")
+        ).pack(pady=8, anchor="center")
 
-        row_frame = tk.Frame(content, bg="black")
-        row_frame.pack(pady=5, anchor="center")
+        row = tk.Frame(content)
+        row.pack(pady=5, anchor="center")
 
-        for sid, price, img_path in by_level[lvl]:
-            frm = tk.Frame(row_frame, bg="black", highlightthickness=1, highlightbackground="yellow")
-            frm.pack(side="left", padx=15)
-
+        for sid, price, imgpath in by_lvl[lvl]:
+            # Siyah kutu kaldırıldı, sadece sarı çerçeve
             try:
-                img = Image.open(img_path)
-                img = img.resize((80, 80), Image.LANCZOS)
+                img = Image.open(imgpath).resize((80, 80), Image.LANCZOS)
             except:
-                img = Image.new("RGB", (80, 80), (100, 100, 100))
+                img = Image.new("RGB", (80, 80), (60, 60, 60))
             photo = ImageTk.PhotoImage(img)
-            lbl_img = tk.Label(frm, image=photo, bg="black")
-            lbl_img.photo = photo
-            lbl_img.pack(pady=5)
+            lbl_img = tk.Label(
+                row,
+                image=photo,
+                bd=0,
+                highlightthickness=2,
+                highlightbackground="yellow"
+            )
+            lbl_img.image = photo
+            lbl_img.pack(side="left", padx=8)
 
-            tk.Label(
-                frm,
-                text=f"{price} Coins",
-                font=("Arial", 10),
-                fg="white",
-                bg="black"
-            ).pack()
-
+            # Fiyat ve buton
             info = check_user_ownership_and_equip(user_id, sid)
             if not info or info[0] == 0:
                 btn = tk.Button(
-                    frm,
+                    row,
                     text="Buy",
-                    font=("Arial", 10),
-                    fg="black",
                     bg="yellow",
-                    command=lambda sid=sid, pr=price: buy_gemi(sid, pr, coins_label, user_id, market_win)
+                    command=lambda s=sid, p=price: buy_gemi(s, p, coins_label, user_id, market_win)
                 )
             else:
                 if info[1] == 1:
-                    btn = tk.Button(
-                        frm,
-                        text="Current",
-                        font=("Arial", 10),
-                        fg="black",
-                        bg="yellow",
-                        command=lambda: messagebox.showinfo("Info", "Bu gemi zaten aktif!")
-                    )
+                    btn = tk.Button(row, text="Current", bg="yellow", state="disabled")
                 else:
                     btn = tk.Button(
-                        frm,
+                        row,
                         text="Select",
-                        font=("Arial", 10),
-                        fg="black",
                         bg="yellow",
-                        command=lambda sid=sid: select_gemi(sid, user_id, market_win)
+                        command=lambda s=sid: select_gemi(s, user_id, market_win)
                     )
-            btn.pack(pady=5)
+            btn.pack(side="left", padx=8, pady=(5,0))
 
     market_win.mainloop()
-
-
-# Doğrudan çalıştırıldığında test
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.title("Market Test")
-    root.geometry("800x600")
-    root.configure(bg="black")
-    tk.Button(
-        root,
-        text="Market'e Git",
-        font=("Arial", 14),
-        fg="black",
-        bg="yellow",
-        command=lambda: show_market(root, user_id=1)
-    ).pack(pady=20)
-    root.mainloop()
