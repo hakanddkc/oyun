@@ -580,16 +580,24 @@ def show_market():
     # ——————————————————
 
 
-def buy_gemi(ship_id, price, lbl):
+def buy_gemi(ship_id, price, update_ui):
+    """
+    Satın alma işlemi.
+    update_ui: ya bir Label widget’ı, ya da bir callable (örneğin lambda) olabilir.
+    """
     coins = load_coins_db(curr_user_id)
-    if coins>=price:
-        save_coins_db(coins-price, curr_user_id)
+    if coins >= price:
+        save_coins_db(coins - price, curr_user_id)
         set_user_ownership(curr_user_id, ship_id)
-        lbl.config(text=f"Coins: {coins-price}")
-        messagebox.showinfo("Başarılı", f"Gemi alındı. Kalan: {coins-price}")
-        show_market()
+        messagebox.showinfo("Başarılı", f"Gemi satın alındı. Kalan coin: {coins - price}")
+        # Eğer bir callable verdiysek onu çağır, değilse Label.config ile text güncelle
+        if callable(update_ui):
+            update_ui()
+        else:
+            update_ui.config(text=f"Coins: {coins - price}")
+        show_market()   # market ekranını yenile
     else:
-        messagebox.showwarning("Yetersiz","Coin yetmiyor")
+        messagebox.showwarning("Yetersiz", "Coin bakiyeniz yetersiz.")
 
 def select_gemi(ship_id):
     equip_gemi(curr_user_id, ship_id)
