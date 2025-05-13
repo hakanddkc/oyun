@@ -370,97 +370,220 @@ def show_level_selection():
         width=20
     ).pack(pady=10)
 
+def draw_message_box(screen, message, submessage=None):
+    width, height = screen.get_size()
+    overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 150))  # yarı saydam siyah
+    screen.blit(overlay, (0, 0))
+
+    box_w, box_h = width * 0.6, height * 0.3
+    box_x, box_y = (width - box_w) / 2, (height - box_h) / 2
+    pygame.draw.rect(screen, YELLOW, (box_x, box_y, box_w, box_h), border_radius=10)
+    inner = pygame.Rect(box_x + 5, box_y + 5, box_w - 10, box_h - 10)
+    pygame.draw.rect(screen, BLACK, inner, border_radius=8)
+
+    font_big = pygame.font.Font("Font/monogram.ttf", 48)
+    txt = font_big.render(message, True, YELLOW)
+    screen.blit(txt, txt.get_rect(center=(width/2, box_y + box_h*0.35)))
+
+    if submessage:
+        font_small = pygame.font.Font("Font/monogram.ttf", 24)
+        sub = font_small.render(submessage, True, YELLOW)
+        screen.blit(sub, sub.get_rect(center=(width/2, box_y + box_h*0.65)))
+
+
+# 1. Add this helper function near your other DB functions:
+def load_global_high_score(level):
+    """Returns the highest score any user has achieved on this level."""
+    conn = sqlite3.connect("game_data.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT MAX(score) FROM user_levels WHERE level_number=?",
+        (level,)
+    )
+    row = c.fetchone()
+    conn.close()
+    return row[0] or 0
+
+
+def load_global_high_score(level):
+    """Returns the highest score any user has achieved on this level."""
+    conn = sqlite3.connect("game_data.db")
+    c = conn.cursor()
+    c.execute(
+        "SELECT MAX(score) FROM user_levels WHERE level_number=?",
+        (level,)
+    )
+    row = c.fetchone()
+    conn.close()
+    return row[0] or 0
+
+
 def start_game(selected_level):
     root.withdraw()
     pygame.init()
-    SW,SH,OF = 750,700,50
-    screen = pygame.display.set_mode((SW+OF,SH+2*OF))
+    SW, SH, OF = 750, 700, 50
+    screen = pygame.display.set_mode((SW + OF, SH + 2 * OF))
     pygame.display.set_caption("Python Space Invaders")
     clock = pygame.time.Clock()
-    font  = pygame.font.Font("Font/monogram.ttf",40)
+    font = pygame.font.Font("Font/monogram.ttf", 40)
 
-    SHOOT, MYST, POW = pygame.USEREVENT, pygame.USEREVENT+1, pygame.USEREVENT+2
-    pygame.time.set_timer(SHOOT,300)
-    pygame.time.set_timer(MYST,random.randint(4000,8000))
-    pygame.time.set_timer(POW, random.randint(8000,12000))
+    # load and scale one static background for all levels
+    bg = pygame.image.load("Graphics/space_background.png").convert()
+    bg = pygame.transform.scale(bg, (SW + OF, SH + 2 * OF))
+
+    # Timed events
+    SHOOT, MYST, POW = pygame.USEREVENT, pygame.USEREVENT + 1, pygame.USEREVENT + 2
+    pygame.time.set_timer(SHOOT, 300)
+    pygame.time.set_timer(MYST, random.randint(4000, 8000))
+    pygame.time.set_timer(POW, random.randint(8000, 12000))
 
     path = get_equipped_ship_path(curr_user_id) or "Graphics/default_spaceship.png"
-    game = Game(SW,SH,OF,selected_level, spaceship_image_path=path)
+    game = Game(SW, SH, OF, selected_level, spaceship_image_path=path)
     game.coins = load_coins_db(curr_user_id)
-    paused=exit_to_menu=victory=False
-    pause_rect = pygame.Rect((SW+OF)//2-70,10,140,50)
+
+    # Track the global high score for this level
+    high_score = load_global_high_score(selected_level)
+
+    paused = False
+    exit_to_menu = False
+    victory = False
+    pause_rect = pygame.Rect((SW + OF) // 2 - 70, 10, 140, 50)
 
     while True:
         for e in pygame.event.get():
-            if e.type==pygame.QUIT:
+            if e.type == pygame.QUIT:
                 save_coins_db(game.coins, curr_user_id)
-                pygame.quit(); sys.exit()
-            if e.type==pygame.KEYDOWN and e.key==pygame.K_p:
+                pygame.quit()
+                sys.exit()
+
+            # Toggle pause
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_p:
                 paused = not paused
-            if game.run and e.type==pygame.MOUSEBUTTONDOWN and pause_rect.collidepoint(e.pos):
+            # Exit to menu when paused and ESC pressed
+            if game.run and paused and e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                exit_to_menu = True
+            # Pause/resume via click
+            if game.run and e.type == pygame.MOUSEBUTTONDOWN and pause_rect.collidepoint(e.pos):
                 paused = not paused
+
+            # Game actions when not paused
             if game.run and not paused:
-                if e.type==SHOOT: game.alien_shoot_laser()
-                if e.type==MYST:
+                if e.type == SHOOT:
+                    game.alien_shoot_laser()
+                if e.type == MYST:
                     game.create_mystery_ship()
-                    pygame.time.set_timer(MYST, random.randint(4000,8000))
-                if e.type==POW: game.create_powerup()
-            if not game.run and e.type==pygame.MOUSEBUTTONDOWN:
-                mp=e.pos
-                b1=pygame.Rect(SW//2-100, SH//2+20,200,40)
-                b2=pygame.Rect(SW//2-100, SH//2+80,200,40)
+                    pygame.time.set_timer(MYST, random.randint(4000, 8000))
+                if e.type == POW:
+                    game.create_powerup()
+
+            # Clicks when game over
+            if not game.run and e.type == pygame.MOUSEBUTTONDOWN:
+                mp = e.pos
+                b1 = pygame.Rect(SW // 2 - 100, SH // 2 + 20, 200, 40)
+                b2 = pygame.Rect(SW // 2 - 100, SH // 2 + 80, 200, 40)
+
                 if b1.collidepoint(mp):
                     if victory:
+                        # Level atla, kaydet ve yeni fonksiyonu başlat
                         unlock_next_level(curr_user_id, game.level)
-                        game.next_level(); victory=False
+                        save_level_score(curr_user_id, selected_level, game.score)
+                        save_coins_db(game.coins, curr_user_id)
+                        pygame.quit()
+                        return start_game(selected_level + 1)
                     else:
+                        # Aynı seviyeyi yeniden oyna
                         game.reset()
+
                 if b2.collidepoint(mp):
-                    exit_to_menu=True
-        if exit_to_menu: break
+                    exit_to_menu = True
 
+        if exit_to_menu:
+            break
+
+        # Update game logic
         if not paused and game.run:
-            game.spaceship_group.update(); game.move_aliens()
-            game.alien_lasers_group.update(); game.mystery_ship_group.update()
-            game.powerups_group.update(); game.update_powerup_status()
+            game.spaceship_group.update()
+            game.move_aliens()
+            game.alien_lasers_group.update()
+            game.mystery_ship_group.update()
+            game.powerups_group.update()
+            game.update_powerup_status()
             game.check_for_collisions()
-            if game.lives<=0:
-                game.run=False; victory=False
+            if game.lives <= 0:
+                game.run = False
+                victory = False
             if not game.aliens_group:
-                game.run=False; victory=True
+                game.run = False
+                victory = True
 
-        screen.fill(GREY)
-        pygame.draw.rect(screen,YELLOW,(10,10,780,780),2)
-        pygame.draw.line(screen,YELLOW,(25,730),(775,730),3)
+        # Draw background
+        screen.blit(bg, (0, 0))
+        pygame.draw.rect(screen, YELLOW, (10, 10, 780, 780), 2)
+        pygame.draw.line(screen, YELLOW, (25, 730), (775, 730), 3)
+
         if game.run:
-            screen.blit(font.render(f"LEVEL {game.level}",True,YELLOW),(570,740))
-            pygame.draw.rect(screen,YELLOW,pause_rect)
-            screen.blit(font.render("PAUSE" if not paused else "RESUME",True,BLACK),
-                        (pause_rect.x+10,pause_rect.y+10))
+            # Current score (top-left)
+            score_surf = font.render(f"SCORE: {game.score}", True, YELLOW)
+            screen.blit(score_surf, (20, 20))
+
+            # User coins (below score)
+            coin_surf = font.render(f"COINS: {game.coins}", True, YELLOW)
+            screen.blit(coin_surf, (20, 20 + score_surf.get_height() + 10))
+
+            # Global high score (top-right)
+            high_surf = font.render(f"HIGH: {high_score}", True, YELLOW)
+            hs_x = screen.get_width() - high_surf.get_width() - 60
+            screen.blit(high_surf, (hs_x, 20))
+
+            # Pause button
+            pygame.draw.rect(screen, YELLOW, pause_rect)
+            lbl = "PAUSE" if not paused else "RESUME"
+            screen.blit(font.render(lbl, True, BLACK),
+                        (pause_rect.x + 10, pause_rect.y + 10))
             create_mute_button(screen, game)
+
+            # Draw sprites
             game.spaceship_group.draw(screen)
             game.spaceship_group.sprite.lasers_group.draw(screen)
-            for obs in game.obstacles: obs.blocks_group.draw(screen)
+            for obs in game.obstacles:
+                obs.blocks_group.draw(screen)
             game.aliens_group.draw(screen)
             game.alien_lasers_group.draw(screen)
             game.mystery_ship_group.draw(screen)
             game.powerups_group.draw(screen)
-        else:
-            overlay=pygame.Surface((SW+OF,SH+2*OF)); overlay.set_alpha(180); overlay.fill(BLACK)
-            screen.blit(overlay,(0,0))
-            big=pygame.font.Font("Font/monogram.ttf",60)
-            msg=big.render("LEVEL COMPLETE!" if victory else "GAME OVER",True,
-                           (0,255,0) if victory else (255,0,0))
-            screen.blit(msg,(SW//2-msg.get_width()//2, SH//2-60))
-            b1=pygame.Rect(SW//2-100, SH//2+20,200,40)
-            b2=pygame.Rect(SW//2-100, SH//2+80,200,40)
-            pygame.draw.rect(screen,YELLOW,b1); pygame.draw.rect(screen,YELLOW,b2)
-            sf=pygame.font.Font("Font/monogram.ttf",40)
-            screen.blit(sf.render("Next Level" if victory else "Play Again",True,BLACK),
-                        (b1.x+20,b1.y+5))
-            screen.blit(sf.render("Exit",True,BLACK),(b2.x+70,b2.y+5))
-        pygame.display.update(); clock.tick(60)
 
+            # Paused overlay with exit hint
+            if paused:
+                draw_message_box(screen,
+                                 "PAUSED",
+                                 "Press P to Resume or ESC to Exit")
+
+        else:
+            # End-of-level overlay
+            overlay = pygame.Surface((SW + OF, SH + 2 * OF), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            screen.blit(overlay, (0, 0))
+            big = pygame.font.Font("Font/monogram.ttf", 60)
+            title = "LEVEL COMPLETE!" if victory else "GAME OVER"
+            color = (0, 255, 0) if victory else (255, 0, 0)
+            msg = big.render(title, True, color)
+            screen.blit(msg,
+                        (SW // 2 - msg.get_width() // 2, SH // 2 - 60))
+
+            b1 = pygame.Rect(SW // 2 - 100, SH // 2 + 20, 200, 40)
+            b2 = pygame.Rect(SW // 2 - 100, SH // 2 + 80, 200, 40)
+            pygame.draw.rect(screen, YELLOW, b1)
+            pygame.draw.rect(screen, YELLOW, b2)
+            sf = pygame.font.Font("Font/monogram.ttf", 40)
+            nl = "Next Level" if victory else "Play Again"
+            screen.blit(sf.render(nl, True, BLACK), (b1.x + 20, b1.y + 5))
+            screen.blit(sf.render("Exit", True, BLACK), (b2.x + 70, b2.y + 5))
+
+        pygame.display.update()
+        clock.tick(60)
+
+    # Save and return to menu
     save_level_score(curr_user_id, selected_level, game.score)
     save_coins_db(game.coins, curr_user_id)
     pygame.quit()
