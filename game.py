@@ -183,13 +183,13 @@ class Game:
             if hits:
                 self.explosion_sound.play()
                 for a in hits:
-                    self.score += a.type*100; self.check_for_highscore()
-                    self.coins += a.type*20; update_coins_in_db(self.user_id, self.coins)
+                    self.score += a.type*20; self.check_for_highscore()
+                    self.coins += a.type*10; update_coins_in_db(self.user_id, self.coins)
                 laser.kill()
             # Mystery ship
             if pygame.sprite.spritecollide(laser, self.mystery_ship_group, True):
-                self.score += 500; self.explosion_sound.play(); self.check_for_highscore()
-                self.coins += 100; update_coins_in_db(self.user_id, self.coins)
+                self.score += 100; self.explosion_sound.play(); self.check_for_highscore()
+                self.coins += 50; update_coins_in_db(self.user_id, self.coins)
                 laser.kill()
             # Powerups
             pus = pygame.sprite.spritecollide(laser, self.powerups_group, True)
