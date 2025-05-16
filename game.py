@@ -184,7 +184,7 @@ class Game:
                 self.explosion_sound.play()
                 for a in hits:
                     self.score += a.type*20; self.check_for_highscore()
-                    self.coins += a.type*10; update_coins_in_db(self.user_id, self.coins)
+                    self.coins += a.type*1; update_coins_in_db(self.user_id, self.coins)
                 laser.kill()
             # Mystery ship
             if pygame.sprite.spritecollide(laser, self.mystery_ship_group, True):

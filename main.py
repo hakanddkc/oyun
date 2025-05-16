@@ -99,7 +99,7 @@ def unlock_next_level(user_id, current_level):
         conn = sqlite3.connect("game_data.db"); c = conn.cursor()
         c.execute("UPDATE user_levels SET is_unlocked=1 WHERE user_id=? AND level_number=?", (user_id,nl))
         conn.commit(); conn.close()
-        messagebox.showinfo("Level Açıldı", f"{nl}. seviye açıldı!")
+        messagebox.showinfo("Level opened", f"{nl}. Level opened!")
 
 # -----------------------------------------------------
 # VERİTABANI İŞLEMLERİ: Market / Ships

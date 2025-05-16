@@ -17,15 +17,15 @@ def show_scoretable(master):
     # Başlık
     header = tk.Label(
         master,
-        text="🏆 Kullanıcıların En Yüksek Skorları 🏆",
-        font=("Arial", 16, "bold"),
+        text="🏆 User's Highest Scores 🏆",
+        font=("Cambria", 16, "bold"),
         fg="yellow",
         bg="black"
     )
     header.pack(pady=(10, 5))
 
     # Treeview oluşturma
-    columns = ("Kullanıcı", "En Yüksek Skor")
+    columns = ("Users", "Highest Scores")
     tree = ttk.Treeview(
         master,
         columns=columns,
