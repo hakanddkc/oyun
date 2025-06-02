@@ -3,16 +3,23 @@ import tkinter as tk
 from tkinter import messagebox
 import pygame, sys, random
 from PIL import Image, ImageTk
-
-from game import Game       # game.py içindeki Game sınıfınız
+from collections import defaultdict
+from game import Game       # game.py içindeki Game sınıfımız
 import scoretable           # Skor tablosu modülü
+from helpers import get_equipped_ship_stats
 
 # -----------------------------------------------------
 # SABİT TANIMLARI
 # -----------------------------------------------------
-GREY   = (50, 50, 50)
+GREY = (50, 50, 50)
 YELLOW = (243, 216, 63)
-BLACK  = (0, 0, 0)
+BLACK = (0, 0, 0)
+WHITE = (255,255,255)
+RED =  (255,0,0)
+MIDNIGHTBLUE = (25,25,112)
+CRIMSON = (162,0,37)
+STEEL_BLUE = (70, 130, 180)
+
 
 # global kullanıcı bilgileri (geri butonları için)
 curr_username = None
@@ -93,7 +100,7 @@ def unlock_next_level(user_id, current_level):
         conn = sqlite3.connect("game_data.db"); c = conn.cursor()
         c.execute("UPDATE user_levels SET is_unlocked=1 WHERE user_id=? AND level_number=?", (user_id,nl))
         conn.commit(); conn.close()
-        messagebox.showinfo("Level Açıldı", f"{nl}. seviye açıldı!")
+        messagebox.showinfo("Level opened", f"{nl}. Level opened!")
 
 # -----------------------------------------------------
 # VERİTABANI İŞLEMLERİ: Market / Ships
@@ -162,10 +169,10 @@ def get_equipped_ship_path(user_id):
 # -----------------------------------------------------
 def create_mute_button(screen, game):
     """Ekranın sağ üstüne mute/unmute ikonu koyar ve tıklamayı kontrol eder."""
-    mute_button_rect = pygame.Rect(screen.get_width() - 60, 10, 50, 50)
+    mute_button_rect = pygame.Rect(screen.get_width() - 300, 25, 50, 50)
     icon_path = "Graphics/volume-up.png" if not game.muted else "Graphics/volume-mute.png"
     speaker_icon = pygame.image.load(icon_path)
-    speaker_icon = pygame.transform.scale(speaker_icon, (40, 40))
+    speaker_icon = pygame.transform.scale(speaker_icon, (30, 30))
     screen.blit(speaker_icon, mute_button_rect)
     if pygame.mouse.get_pressed()[0] and mute_button_rect.collidepoint(pygame.mouse.get_pos()):
         game.toggle_music()
@@ -185,40 +192,128 @@ def show_login_window():
     bg_label.place(x=0, y=0, relwidth=1, relheight=1)
     # ————————————————————————————————
 
-    root.title("Giriş Yap")
+    root.title("GirişYap")
     root.geometry("700x500")
+
+    # ——— Stil Ayarları ———
+    TITLE_FONT = ("Constantia", 26, "bold")
+    LABEL_FONT = ("Cambria", 14)
+    ENTRY_FONT = ("Cambria", 12)
+    BUTTON_FONT = ("Cambria", 12, "bold")
+
+    TITLE_BG = "#0f152a"
+    TITLE_FG = "#FFD700"
+
+    LABEL_BG = "#0f152a"
+    LABEL_FG = "#FFD700"
+
+    ENTRY_BG = "#FFF8DC"
+    ENTRY_FG = "#0f152a"
+
+    BUTTON_BG = "#FFD700"
+    BUTTON_FG = "#0f152a"
+
+    BUTTON_WIDTH = 13
+    BUTTON_HEIGHT = 1
+
+    PADDING = (5, 5)
+    # —————————————————————
 
     # ——— Sayfa Başlığı ———
     tk.Label(
         root,
-        text="Giriş Yapma Sayfası",
-        font=("Arial", 24, "bold"),
-        fg="yellow",
-        bg="black"
-    ).pack(pady=(20, 15))
+        text="Log in",
+        font=TITLE_FONT,
+        fg=TITLE_FG,
+        bg=TITLE_BG,
+        padx=10,
+        pady=5
+    ).pack(pady=(30, 20))
     # ——————————————————
 
-    tk.Label(root, text="Kullanıcı Adı:", fg="yellow", bg="black", font=("Arial",12)).pack(pady=5)
-    e_user = tk.Entry(root, font=("Arial",12))
-    e_user.pack(pady=5)
+    # ——— Kullanıcı Adı ———
+    tk.Label(
+        root,
+        text="User name:",
+        font=LABEL_FONT,
+        fg=LABEL_FG,
+        bg=LABEL_BG
+    ).pack(pady=PADDING)
 
-    tk.Label(root, text="Şifre:", fg="yellow", bg="black", font=("Arial",12)).pack(pady=5)
-    e_pass = tk.Entry(root, show="*", font=("Arial",12))
-    e_pass.pack(pady=5)
+    e_user = tk.Entry(
+        root,
+        font=ENTRY_FONT,
+        bg=ENTRY_BG,
+        fg=ENTRY_FG,
+        width=30
+    )
+    e_user.pack(pady=(5, 15))
 
+    # ——— Şifre ———
+    tk.Label(
+        root,
+        text="Password:",
+        font=LABEL_FONT,
+        fg=LABEL_FG,
+        bg=LABEL_BG
+    ).pack(pady=PADDING)
+
+    e_pass = tk.Entry(
+        root,
+        font=ENTRY_FONT,
+        bg=ENTRY_BG,
+        fg=ENTRY_FG,
+        show="*",
+        width=30
+    )
+    e_pass.pack(pady=(5, 20))
+
+    # ——— Giriş İşlevi ———
     def attempt():
         global curr_username, curr_user_id
         u, p = e_user.get().strip(), e_pass.get().strip()
         uid = login_user(u, p)
         if uid:
             curr_username, curr_user_id = u, uid
-            messagebox.showinfo("Başarılı", f"Hoşgeldiniz, {u}!")
+            messagebox.showinfo("Successful", f"Welcome, {u}!")
             show_main_menu_welcome()
         else:
-            messagebox.showerror("Hata", "Yanlış kullanıcı veya şifre")
+            messagebox.showerror("Error", "The wrong username or password!")
 
-    tk.Button(root, text="Giriş Yap", command=attempt, bg="yellow", width=20).pack(pady=10)
-    tk.Button(root, text="Kayıt Ol", command=show_register_window, bg="yellow", width=20).pack()
+    # ——— Butonlar ———
+    tk.Button(
+        root,
+        text="Log in",
+        command=attempt,
+        font=BUTTON_FONT,
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        width=BUTTON_WIDTH,
+        height=BUTTON_HEIGHT
+    ).pack(pady=(5, 10))
+
+    tk.Button(
+        root,
+        text="Sign up",
+        command=show_register_window,
+        font=BUTTON_FONT,
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        width=BUTTON_WIDTH,
+        height=BUTTON_HEIGHT
+    ).pack(pady=(5, 10))
+
+    # ——— Back (Geri) Butonu ———
+    tk.Button(
+        root,
+        text="Back",
+        command=main,
+        font=BUTTON_FONT,
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        width=BUTTON_WIDTH,
+        height=BUTTON_HEIGHT
+    ).pack(pady=(5, 15))
 
 def show_register_window():
     clear_window()
@@ -235,41 +330,92 @@ def show_register_window():
     root.title("Kayıt Ol")
     root.geometry("700x500")
 
+    # ——— Stil Ayarları ———
+    TITLE_FONT = ("Constantia", 26, "bold")
+    LABEL_FONT = ("Cambria", 14)
+    ENTRY_FONT = ("Cambria", 12)
+    BUTTON_FONT = ("Cambria", 12, "bold")
+
+    TITLE_BG = "#0f152a"
+    TITLE_FG = "#FFD700"
+
+    LABEL_BG = "#0f152a"
+    LABEL_FG = "#FFD700"
+
+    ENTRY_BG = "#FFF8DC"
+    ENTRY_FG = "#0f152a"
+
+    BUTTON_BG = "#FFD700"
+    BUTTON_FG = "#0f152a"
+
+    BUTTON_WIDTH = 13
+    BUTTON_HEIGHT = 1
+
+    PADDING = (5, 5)
+    # —————————————————————
+
     # ——— Sayfa Başlığı ———
     tk.Label(
         root,
-        text="Kayıt Olma Sayfası",
-        font=("Arial", 24, "bold"),
-        fg="yellow",
-        bg="black"
-    ).pack(pady=(20, 15))
+        text="Sign up",
+        font=TITLE_FONT,
+        fg=TITLE_FG,
+        bg=TITLE_BG,
+        padx=10,
+        pady=5
+    ).pack(pady=(30, 20))
     # ——————————————————
 
-    tk.Label(root, text="Kullanıcı Adı:", fg="yellow", bg="black", font=("Arial",12)).pack(pady=5)
-    e_user = tk.Entry(root, font=("Arial",12))
-    e_user.pack(pady=5)
+    # ——— Kullanıcı Adı ———
+    tk.Label(root, text="User name:", font=LABEL_FONT, fg=LABEL_FG, bg=LABEL_BG).pack(pady=PADDING)
+    e_user = tk.Entry(root, font=ENTRY_FONT, bg=ENTRY_BG, fg=ENTRY_FG, width=30)
+    e_user.pack(pady=(10, 5))
 
-    tk.Label(root, text="Şifre:", fg="yellow", bg="black", font=("Arial",12)).pack(pady=5)
-    e_pass = tk.Entry(root, show="*", font=("Arial",12))
-    e_pass.pack(pady=5)
+    # ——— Şifre ———
+    tk.Label(root, text="Password:", font=LABEL_FONT, fg=LABEL_FG, bg=LABEL_BG).pack(pady=PADDING)
+    e_pass = tk.Entry(root, font=ENTRY_FONT, bg=ENTRY_BG, fg=ENTRY_FG, show="*", width=30)
+    e_pass.pack(pady=(5, 5))
 
-    tk.Label(root, text="Şifre Tekrar:", fg="yellow", bg="black", font=("Arial",12)).pack(pady=5)
-    e_conf = tk.Entry(root, show="*", font=("Arial",12))
-    e_conf.pack(pady=5)
+    # ——— Şifre (Tekrar) ———
+    tk.Label(root, text="Password again:", font=LABEL_FONT, fg=LABEL_FG, bg=LABEL_BG).pack(pady=PADDING)
+    e_conf = tk.Entry(root, font=ENTRY_FONT, bg=ENTRY_BG, fg=ENTRY_FG, show="*", width=30)
+    e_conf.pack(pady=(5, 5))
 
+    # ——— Buton İşlevi ———
     def attempt():
         u, p, c = e_user.get().strip(), e_pass.get().strip(), e_conf.get().strip()
         if p != c:
-            messagebox.showerror("Hata","Şifreler eşleşmiyor")
+            messagebox.showerror("Error", "Password does not match")
             return
         if register_user_db(u, p):
-            messagebox.showinfo("Başarılı","Kayıt başarılı")
+            messagebox.showinfo("Successful", "Registration successful")
             show_login_window()
         else:
-            messagebox.showerror("Hata","Kullanıcı zaten mevcut")
+            messagebox.showerror("Error", "User already exists")
 
-    tk.Button(root, text="Kayıt Ol", command=attempt, bg="yellow", width=20).pack(pady=10)
-    tk.Button(root, text="Geri",     command=show_login_window, bg="yellow", width=20).pack()
+    # ——— Butonlar ———
+    tk.Button(
+        root,
+        text="Sign up",
+        command=attempt,
+        font=BUTTON_FONT,
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        width=BUTTON_WIDTH,
+        height=BUTTON_HEIGHT
+    ).pack(pady=(15, 15))
+
+    tk.Button(
+        root,
+        text="Back",
+        command=main,
+        font=BUTTON_FONT,
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        width=BUTTON_WIDTH,
+        height=BUTTON_HEIGHT
+    ).pack(pady=(5, 15))
+
 
 
 def show_main_menu_welcome():
@@ -284,33 +430,59 @@ def show_main_menu_welcome():
     menu_bg_label.place(x=0, y=0, relwidth=1, relheight=1)
     # ——————————————————————————————
 
-    root.title("Ana Menü")
+    root.title("AnaMenü")
     root.geometry("700x500")
     root.configure(bg="black")
 
     coins = load_coins_db(curr_user_id)
-    lbl = tk.Label(
+
+    # Welcome Label
+    lbl_welcome = tk.Label(
         root,
-        text=f"Hoşgeldiniz, {curr_username}!\nCoins: {coins}",
-        fg="yellow",
-        font=("Arial",18,"bold"),
-        bg="black"
+        text=f"Welcome, {curr_username}!",
+        fg="midnightblue",
+        font=("Constantia", 18, "bold"),
+        bg="yellow"
     )
-    lbl.pack(pady=20)
+    lbl_welcome.pack(pady=(25, 10))  # İlk padding üst, ikinci alt
+
+    # Coins Label
+    lbl_coins = tk.Label(
+        root,
+        text=f"Coins: {coins}",
+        fg="midnightblue",
+        font=("Cambria", 14, "bold"),
+        bg="yellow"
+    )
+    lbl_coins.pack(pady=(5, 50))
 
     def refresh():
-        lbl.config(text=f"Hoşgeldiniz, {curr_username}!\nCoins: {load_coins_db(curr_user_id)}")
+        # Welcome Label'ı güncelle
+        lbl_welcome.config(text=f"Welcome, {curr_username}!")
+
+        # Coins Label'ı güncelle
+        lbl_coins.config(text=f"Coins: {load_coins_db(curr_user_id)}")
 
     btns = [
-        ("Oyuna Başla",  show_level_selection),
-        ("Market",       show_market),
-        ("Profil",       show_profile),
-        ("Skor Tablosu", show_scoreboard),
-        ("Yenile",       refresh),
-        ("Çıkış",        root.destroy),
+        ("Play", show_level_selection),
+        ("Store", show_market),
+        ("Inventory", show_profile),
+        ("Scoreboard", show_scoreboard),
+        ("Refresh", refresh),
+        ("Exit", root.destroy),
     ]
+
     for (t, cmd) in btns:
-        tk.Button(root, text=t, command=cmd, bg="yellow", width=20).pack(pady=5)
+        tk.Button(
+            root,
+            text=t,
+            command=cmd,
+            bg="yellow",
+            fg="midnightblue",  # Yazı rengi
+            font=("Cambria", 12, "bold"),  # Font ayarı
+            width=15
+        ).pack(pady=5)
+
 
 def show_level_selection():
     clear_window()
@@ -324,14 +496,14 @@ def show_level_selection():
     bg_label.place(x=0, y=0, relwidth=1, relheight=1)
     # ————————————————————————————————
 
-    root.title("Seviye Seç")
+    root.title("SeviyeSeç")
     root.geometry("700x500")
 
     # ——— Sayfa Başlığı ———
     tk.Label(
         root,
-        text="Seviye Seçme Sayfası",
-        font=("Arial", 24, "bold"),
+        text="Select level",
+        font=("Constantia", 24, "bold"),
         fg="yellow",
         bg="black"
     ).pack(pady=(20, 15))
@@ -364,9 +536,10 @@ def show_level_selection():
 
     tk.Button(
         root,
-        text="Geri",
+        text="Back",
         command=show_main_menu_welcome,
         bg="yellow",
+        font=("Constantia", 10, "bold"),
         width=20
     ).pack(pady=10)
 
@@ -428,21 +601,22 @@ def start_game(selected_level):
     clock = pygame.time.Clock()
     font = pygame.font.Font("Font/monogram.ttf", 40)
 
-    # load and scale one static background for all levels
+    # Static arka plan
     bg = pygame.image.load("Graphics/space_background.png").convert()
     bg = pygame.transform.scale(bg, (SW + OF, SH + 2 * OF))
 
-    # Timed events
+    # Zamanlı eventler
     SHOOT, MYST, POW = pygame.USEREVENT, pygame.USEREVENT + 1, pygame.USEREVENT + 2
     pygame.time.set_timer(SHOOT, 300)
     pygame.time.set_timer(MYST, random.randint(4000, 8000))
     pygame.time.set_timer(POW, random.randint(8000, 12000))
 
+    # Seçili geminin yolu ve Game nesnesi
     path = get_equipped_ship_path(curr_user_id) or "Graphics/default_spaceship.png"
-    game = Game(SW, SH, OF, selected_level, spaceship_image_path=path)
+    game = Game(SW, SH, OF, selected_level, curr_user_id, spaceship_image_path=path)
     game.coins = load_coins_db(curr_user_id)
 
-    # Track the global high score for this level
+    # Global high score
     high_score = load_global_high_score(selected_level)
 
     paused = False
@@ -451,23 +625,20 @@ def start_game(selected_level):
     pause_rect = pygame.Rect((SW + OF) // 2 - 70, 10, 140, 50)
 
     while True:
+        # Olayları işle
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
                 save_coins_db(game.coins, curr_user_id)
                 pygame.quit()
                 sys.exit()
 
-            # Toggle pause
             if e.type == pygame.KEYDOWN and e.key == pygame.K_p:
                 paused = not paused
-            # Exit to menu when paused and ESC pressed
             if game.run and paused and e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 exit_to_menu = True
-            # Pause/resume via click
             if game.run and e.type == pygame.MOUSEBUTTONDOWN and pause_rect.collidepoint(e.pos):
                 paused = not paused
 
-            # Game actions when not paused
             if game.run and not paused:
                 if e.type == SHOOT:
                     game.alien_shoot_laser()
@@ -477,7 +648,6 @@ def start_game(selected_level):
                 if e.type == POW:
                     game.create_powerup()
 
-            # Clicks when game over
             if not game.run and e.type == pygame.MOUSEBUTTONDOWN:
                 mp = e.pos
                 b1 = pygame.Rect(SW // 2 - 100, SH // 2 + 20, 200, 40)
@@ -485,14 +655,12 @@ def start_game(selected_level):
 
                 if b1.collidepoint(mp):
                     if victory:
-                        # Level atla, kaydet ve yeni fonksiyonu başlat
                         unlock_next_level(curr_user_id, game.level)
                         save_level_score(curr_user_id, selected_level, game.score)
                         save_coins_db(game.coins, curr_user_id)
                         pygame.quit()
                         return start_game(selected_level + 1)
                     else:
-                        # Aynı seviyeyi yeniden oyna
                         game.reset()
 
                 if b2.collidepoint(mp):
@@ -501,7 +669,7 @@ def start_game(selected_level):
         if exit_to_menu:
             break
 
-        # Update game logic
+        # Oyun mantığını güncelle
         if not paused and game.run:
             game.spaceship_group.update()
             game.move_aliens()
@@ -510,40 +678,71 @@ def start_game(selected_level):
             game.powerups_group.update()
             game.update_powerup_status()
             game.check_for_collisions()
-            if game.lives <= 0:
-                game.run = False
-                victory = False
-            if not game.aliens_group:
-                game.run = False
-                victory = True
+            # Boss ve boss lazerlerini güncelle
+        if game.boss_group and game.boss_group.sprite:
+            boss = game.boss_group.sprite
+            game.boss_group.update(game.boss_lasers_group, game.screen_width)
+            game.boss_lasers_group.update()
 
-        # Draw background
+            # Boss çizimi
+            game.boss_group.draw(screen)
+            game.boss_lasers_group.draw(screen)
+
+            # Boss sağlık barı
+            bar_width = 200
+            bar_height = 20
+            bar_x = (SW + OF) // 2 - bar_width // 2
+            bar_y = 80
+
+            current_health = max(0, boss.health)
+            fill = int((current_health / boss.max_health) * bar_width)
+
+            pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # Kırmızı zemin
+            pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))  # Yeşil dolu kısım
+            pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)  # Beyaz kenarlık
+
+        else:
+            game.boss_group.empty()  # Boss yoksa temizle
+            game.boss_lasers_group.empty()
+
+            # Can bitmişse oyun sonu (kaybetti)
+        if game.lives <= 0:
+            game.run = False
+            victory = False
+
+            # Boss yoksa VE uzaylılar yoksa => kazandı
+        if not game.aliens_group and not game.boss_group:
+            game.run = False
+            victory = True
+
+        # Çizimler
         screen.blit(bg, (0, 0))
         pygame.draw.rect(screen, YELLOW, (10, 10, 780, 780), 2)
         pygame.draw.line(screen, YELLOW, (25, 730), (775, 730), 3)
 
         if game.run:
-            # Current score (top-left)
+            # Skor
             score_surf = font.render(f"SCORE: {game.score}", True, YELLOW)
             screen.blit(score_surf, (20, 20))
-
-            # User coins (below score)
-            coin_surf = font.render(f"COINS: {game.coins}", True, YELLOW)
-            screen.blit(coin_surf, (20, 20 + score_surf.get_height() + 10))
-
-            # Global high score (top-right)
+            # Coin
+            coin_surf  = font.render(f"COINS: {game.coins}", True, YELLOW)
+            screen.blit(coin_surf,  (20, 20 + score_surf.get_height() + 10))
+            # Health
+            health_surf = font.render(f"HEALTH: {game.lives}", True, YELLOW)
+            screen.blit(health_surf, (20, 20 + 2 * (score_surf.get_height() + 10)))
+            # Highscore
             high_surf = font.render(f"HIGH: {high_score}", True, YELLOW)
             hs_x = screen.get_width() - high_surf.get_width() - 60
             screen.blit(high_surf, (hs_x, 20))
 
-            # Pause button
+            # Pause düğmesi
             pygame.draw.rect(screen, YELLOW, pause_rect)
             lbl = "PAUSE" if not paused else "RESUME"
             screen.blit(font.render(lbl, True, BLACK),
                         (pause_rect.x + 10, pause_rect.y + 10))
             create_mute_button(screen, game)
 
-            # Draw sprites
+            # Sprite grupları
             game.spaceship_group.draw(screen)
             game.spaceship_group.sprite.lasers_group.draw(screen)
             for obs in game.obstacles:
@@ -552,15 +751,26 @@ def start_game(selected_level):
             game.alien_lasers_group.draw(screen)
             game.mystery_ship_group.draw(screen)
             game.powerups_group.draw(screen)
+            if game.boss_group.sprite:
+                game.boss_group.update(game.boss_lasers_group, SW + OF)
+            game.boss_group.draw(screen)
+            if game.boss_group.sprite:
+                boss = game.boss_group.sprite
+                bar_width = 200
+                bar_height = 20
+                bar_x = (SW + OF) // 2 - bar_width // 2
+                bar_y = 80
+                fill = int((boss.health / boss.max_health) * bar_width)
+                pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # Arka plan
+                pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))  # Doluluk
 
-            # Paused overlay with exit hint
             if paused:
                 draw_message_box(screen,
                                  "PAUSED",
                                  "Press P to Resume or ESC to Exit")
 
         else:
-            # End-of-level overlay
+            # Seviye bitiş ekranı
             overlay = pygame.Surface((SW + OF, SH + 2 * OF), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
             screen.blit(overlay, (0, 0))
@@ -583,7 +793,7 @@ def start_game(selected_level):
         pygame.display.update()
         clock.tick(60)
 
-    # Save and return to menu
+    # Menüye dönmeden önce verileri kaydet
     save_level_score(curr_user_id, selected_level, game.score)
     save_coins_db(game.coins, curr_user_id)
     pygame.quit()
@@ -597,12 +807,52 @@ def show_market():
     root.title("Market")
     root.geometry("800x600")
 
-    # ——— Tam ekran Canvas ve arka plan resmi ———
-    canvas = tk.Canvas(root, width=800, height=600, highlightthickness=0)
-    canvas.pack(fill="both", expand=True)
+    # ——— Scrollable Canvas & Scrollbar + Scroll Arrows ———
+    outer_frame = tk.Frame(root)
+    outer_frame.pack(fill="both", expand=True)
 
+    canvas = tk.Canvas(
+        outer_frame,
+        width=750,  # biraz daralttık, çünkü yan tarafta scroll kontrol çerçevesi var
+        height=600,
+        highlightthickness=0
+    )
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Scroll kontrol çerçevesi (yukarı oka, scrollbar'a, aşağı oka yer açar)
+    scroll_frame = tk.Frame(outer_frame)
+    scroll_frame.pack(side="right", fill="y")
+
+    up_btn = tk.Button(
+        scroll_frame, text="▲",
+        bg="yellow", fg="black",
+        font=("Constantia", 10, "bold"),
+        command=lambda: canvas.yview_scroll(-1, "units")
+    )
+    up_btn.pack(fill="x")
+
+    scrollbar = tk.Scrollbar(
+        scroll_frame,
+        orient="vertical",
+        command=canvas.yview
+    )
+    scrollbar.pack(fill="y", expand=True)
+
+    down_btn = tk.Button(
+        scroll_frame, text="▼",
+        bg="yellow", fg="black",
+        font=("Constantia", 10, "bold"),
+        command=lambda: canvas.yview_scroll(1, "units")
+    )
+    down_btn.pack(fill="x")
+
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+    # ——— Scrollable Canvas & Scroll Arrows Bitiş ———
+
+    # ——— Tam ekran arka plan resmi ———
     bg_img = ImageTk.PhotoImage(
-        Image.open("Graphics/anamenuu.png").resize((800, 600), Image.LANCZOS)
+        Image.open("Graphics/anamenuu.png").resize((800, 700), Image.LANCZOS)
     )
     canvas.bg_img = bg_img
     canvas.create_image(0, 0, anchor="nw", image=bg_img)
@@ -611,13 +861,14 @@ def show_market():
     # ——— Başlık ve Geri butonu ———
     canvas.create_text(
         400, 40,
-        text="Market Sayfası",
-        font=("Arial", 24, "bold"),
+        text="Space Store",
+        font=("Constantia", 24, "bold"),
         fill="yellow"
     )
     back_btn = tk.Button(
-        root, text="← Geri",
+        root, text="← back",
         bg="yellow", fg="black",
+        font=("Constantia", 10, "bold"),
         command=show_main_menu_welcome
     )
     canvas.create_window(10, 10, anchor="nw", window=back_btn)
@@ -627,36 +878,47 @@ def show_market():
     coins = load_coins_db(curr_user_id)
     coins_text = canvas.create_text(
         400, 80,
-        text=f"Coins: {coins}",
-        font=("Arial", 14),
+        text=f"Coins :  {coins}",
+        font=("Cambria", 14, "bold"),
         fill="yellow"
     )
     # ——————————————————————
 
     # Veritabanından gemileri oku ve seviyelere göre grupla
     init_ships_and_user_ships_db()
-    ships = load_ships_from_db()
-    from collections import defaultdict
+    ships = load_ships_from_db()  # her satır ya 6 elemanlı (id, level, price, imgpath, health, shots) ya da eski 4 elemanlı
+
     by_lvl = defaultdict(list)
-    for sid, lvl, price, imgpath in ships:
-        by_lvl[lvl].append((sid, price, imgpath))
+    for row in ships:
+        if len(row) == 6:
+            sid, lvl, price, imgpath, health, shots = row
+        else:
+            # eski 4-elemanlı satır geldi, seviye bazlı default değerleri ver
+            sid, lvl, price, imgpath = row
+            if lvl == 1:
+                health, shots = 3, 1
+            elif lvl == 2:
+                health, shots = 4, 2
+            else:
+                health, shots = 5, 3
+        by_lvl[lvl].append((sid, price, imgpath, health, shots))
 
     # ——— Gemileri çiz ———
     start_y = 120
-    x_spacing = 140
+    x_spacing = 150
 
     for lvl in sorted(by_lvl):
         # Seviye başlığı
         canvas.create_text(
             400, start_y,
-            text=f"Level {lvl} Gemileri",
-            font=("Arial", 16, "bold"),
+            text=f"{lvl}. Level",
+            font=("Cambria", 14, "bold"),
             fill="yellow"
         )
-        y = start_y + 30
+        y = start_y + 20
         x = 60
 
-        for sid, price, imgpath in by_lvl[lvl]:
+        for sid, price, imgpath, health, shots in by_lvl[lvl]:
             # Gemi resmi
             try:
                 img = Image.open(imgpath).resize((80, 80), Image.LANCZOS)
@@ -667,12 +929,20 @@ def show_market():
             canvas.create_image(x, y, anchor="nw", image=photo)
 
             # Fiyat etiketi
-            canvas.create_rectangle(x, y+85, x+80, y+105, fill="black", outline="")
+            canvas.create_rectangle(x, y+85, x+80, y+105, fill="midnightblue", outline="")
             canvas.create_text(
                 x+40, y+95,
-                text=f"{price} Coins",
-                font=("Arial", 10),
+                text=f"{price} Coin",
+                font=("Cambria", 10),
                 fill="white"
+            )
+
+            # Can & atış hakkı
+            canvas.create_text(
+                x+40, y+115,
+                text=f"❤ {health}   🔫 {shots}",
+                font=("Cambria", 10),
+                fill="lightgreen"
             )
 
             # Butonları ekle
@@ -682,7 +952,13 @@ def show_market():
                     root, text="Buy",
                     bg="yellow",
                     command=lambda s=sid, p=price: (
-                        buy_gemi(s, p, lambda: canvas.itemconfigure(coins_text, text=f"Coins: {load_coins_db(curr_user_id)}")),
+                        buy_gemi(
+                            s, p,
+                            lambda: canvas.itemconfigure(
+                                coins_text,
+                                text=f"Coins : {load_coins_db(curr_user_id)}"
+                            )
+                        ),
                         show_market()
                     )
                 )
@@ -696,7 +972,7 @@ def show_market():
                         command=lambda s=sid: select_gemi(s)
                     )
 
-            canvas.create_window(x+40, y+125, window=btn)
+            canvas.create_window(x+40, y+145, window=btn)
             x += x_spacing
 
         start_y += 180
@@ -712,24 +988,22 @@ def buy_gemi(ship_id, price, update_ui):
     if coins >= price:
         save_coins_db(coins - price, curr_user_id)
         set_user_ownership(curr_user_id, ship_id)
-        messagebox.showinfo("Başarılı", f"Gemi satın alındı. Kalan coin: {coins - price}")
-        # Eğer bir callable verdiysek onu çağır, değilse Label.config ile text güncelle
+        messagebox.showinfo("Successful", f"Ship purchased, remaining coin: {coins - price}")
         if callable(update_ui):
             update_ui()
         else:
             update_ui.config(text=f"Coins: {coins - price}")
         show_market()   # market ekranını yenile
     else:
-        messagebox.showwarning("Yetersiz", "Coin bakiyeniz yetersiz.")
+        messagebox.showwarning("Insufficient", "Your coin balance is insufficient.")
 
 def select_gemi(ship_id):
     equip_gemi(curr_user_id, ship_id)
-    messagebox.showinfo("Seçildi","Gemi seçildi")
+    messagebox.showinfo("Selected","The ship was selected")
     show_market()
-
 def show_profile():
     clear_window()
-    root.title("Profil")
+    root.title("profilSayfası")
     root.geometry("700x500")
 
     # ——— Tam ekran Canvas ve arka plan resmi ———
@@ -745,9 +1019,9 @@ def show_profile():
 
     # ——— Başlık ———
     canvas.create_text(
-        350, 40,
-        text="Profil Sayfası",
-        font=("Arial", 24, "bold"),
+        350, 50,
+        text="Inventory",
+        font=("Constantia", 24, "bold"),
         fill="yellow"
     )
     # ——————————
@@ -761,9 +1035,9 @@ def show_profile():
 
     # ——— Kullanıcı bilgileri ———
     canvas.create_text(
-        350, 80,
-        text=f"Kullanıcı: {u}    Coins: {cns}",
-        font=("Arial", 14),
+        350, 100,
+        text=f"User :   {u}                         Coins :   {cns}",
+        font=("Cambria", 14),
         fill="yellow"
     )
     # ——————————
@@ -787,9 +1061,9 @@ def show_profile():
 
     for idx, (img_path,) in enumerate(owned):
         try:
-            img = Image.open(img_path).resize((64, 64), Image.LANCZOS)
+            img = Image.open(img_path).resize((80, 80), Image.LANCZOS)
         except:
-            img = Image.new("RGB", (64, 64), (80, 80, 80))
+            img = Image.new("RGB", (80, 80), (80, 80, 80))
         photo = ImageTk.PhotoImage(img)
         canvas.profile_images.append(photo)
         x = x_start + (idx % 6) * spacing
@@ -799,17 +1073,19 @@ def show_profile():
     # ——— Geri butonu ———
     back_btn = tk.Button(
         root,
-        text="← Geri",
+        text="← Back",
         bg="yellow",
         fg="black",
+        font=("Constantia", 10, "bold"),
         command=show_main_menu_welcome
     )
     canvas.create_window(10, 10, anchor="nw", window=back_btn)
     # —————————————————
 
+
 def show_scoreboard():
     clear_window()
-    root.title("Skor Tablosu")
+    root.title("SkorTablosu")
     root.geometry("700x500")
 
     # ——— Tam ekran Canvas ve arka plan resmi ———
@@ -825,11 +1101,11 @@ def show_scoreboard():
 
     # ——— Başlık ———
     # Arkasına siyah bir kutucuk çizip üzerine sarı başlık yazıyoruz
-    canvas.create_rectangle(150, 20, 550, 70, fill="black", outline="")
+    #canvas.create_rectangle(150, 20, 550, 70, fill="black", outline="")
     canvas.create_text(
         350, 45,
-        text="Skor Tablosu",
-        font=("Arial", 24, "bold"),
+        text="Scoreboard",
+        font=("Constantia", 24, "bold"),
         fill="yellow"
     )
     # ——————————
@@ -847,10 +1123,10 @@ def show_scoreboard():
     # ——— Geri butonu ———
     back_btn = tk.Button(
         root,
-        text="← Geri",
+        text="← Back",
         bg="yellow",
         fg="black",
-        font=("Arial", 12, "bold"),
+        font=("Constantia", 10, "bold"),
         command=show_main_menu_welcome
     )
     canvas.create_window(10, 10, anchor="nw", window=back_btn)
@@ -873,29 +1149,50 @@ def main():
     bg_label.place(x=0, y=0, relwidth=1, relheight=1)
     # ————————————————————————————————
 
-    root.title("Hoşgeldiniz")
+    root.title("AnaSayfa")
     root.geometry("700x500")
 
-    # ——— Başlık etiketi ———
-    TITLE_BG = "#0f152a"   # koyu uzay-laciverti
-    TITLE_FG = "#FFD700"   # parlak sarı
+    # ——— Renk ve font ayarları ———
+    TITLE_BG = "#0f152a"  # koyu uzay-laciverti
+    TITLE_FG = "#FFD700"  # parlak sarı
+    BUTTON_BG = "#FFD700" # buton arkaplanı - parlak sarı
+    BUTTON_FG = "#0f152a" # buton yazı rengi - koyu lacivert
+    FONT_TITLE = ("Constantia", 24, "bold")
+    FONT_BUTTON = ("Cambria", 13, "bold")
+    PADDING = (10, 15)
+    # ————————————————————————————
 
+    # ——— Başlık etiketi ———
     title_lbl = tk.Label(
         root,
-        text="Spaceshipe Hoşgeldiniz",
-        font=("Arial", 28, "bold"),
+        text="Welcome to the Spaceship",
+        font=FONT_TITLE,
         fg=TITLE_FG,
         bg=TITLE_BG,
-        padx=20,
-        pady=10
+        padx=5,
+        pady=5,
     )
-    title_lbl.pack(pady=(60, 30))
-    # ——————————————————
+    title_lbl.pack(pady=(30, 60))
+    # ————————————————————
 
-    # Butonları başlığın altına indiriyoruz
-    tk.Button(root, text="Giriş Yap",    command=show_login_window,    bg="yellow", width=20).pack(pady=10)
-    tk.Button(root, text="Kayıt Ol",     command=show_register_window, bg="yellow", width=20).pack(pady=10)
-    tk.Button(root, text="Çıkış",        command=root.destroy,         bg="yellow", width=20).pack(pady=10)
+    # ——— Butonlar ———
+    buttons = [
+        ("Log in", show_login_window),
+        ("Sign up", show_register_window),
+        ("Exit", root.destroy),
+    ]
+
+    for text, command in buttons:
+        tk.Button(
+            root,
+            text=text,
+            command=command,
+            bg=BUTTON_BG,
+            fg=BUTTON_FG,
+            font=FONT_BUTTON,
+            width=18
+        ).pack(pady=PADDING)
+
 
 if __name__=="__main__":
     root = tk.Tk()
