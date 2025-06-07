@@ -22,7 +22,7 @@ class MysteryShip(pygame.sprite.Sprite):
         super().__init__()
         self.screen_width = screen_width
         self.offset = offset
-        self.image = pygame.image.load("Graphics/mystery.png")
+        self.image = pygame.image.load("Graphics/alien_33.png")
 
         # Mystery Ship için boyutları küçültüyoruz
         self.image = pygame.transform.scale(self.image, (60, 40))  # Boyutları küçültüyoruz (örneğin 60x40)

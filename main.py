@@ -20,7 +20,6 @@ MIDNIGHTBLUE = (25,25,112)
 CRIMSON = (162,0,37)
 STEEL_BLUE = (70, 130, 180)
 
-
 # global kullanıcı bilgileri (geri butonları için)
 curr_username = None
 curr_user_id  = None
@@ -100,7 +99,7 @@ def unlock_next_level(user_id, current_level):
         conn = sqlite3.connect("game_data.db"); c = conn.cursor()
         c.execute("UPDATE user_levels SET is_unlocked=1 WHERE user_id=? AND level_number=?", (user_id,nl))
         conn.commit(); conn.close()
-        messagebox.showinfo("Level opened", f"{nl}. Level opened!")
+        #messagebox.showinfo("Level opened", f"{nl}. Level opened!")
 
 # -----------------------------------------------------
 # VERİTABANI İŞLEMLERİ: Market / Ships
@@ -176,6 +175,15 @@ def create_mute_button(screen, game):
     screen.blit(speaker_icon, mute_button_rect)
     if pygame.mouse.get_pressed()[0] and mute_button_rect.collidepoint(pygame.mouse.get_pos()):
         game.toggle_music()
+
+def draw_mute_button(screen, game):
+    global mute_button_rect
+    mute_button_rect = pygame.Rect(screen.get_width() - 60, 10, 40, 40)
+    icon = "volume-up" if not game.muted else "volume-mute"
+    icon_path = f"Graphics/{icon}.png"
+    icon_img = pygame.image.load(icon_path)
+    icon_img = pygame.transform.scale(icon_img, (30, 30))
+    screen.blit(icon_img, mute_button_rect)
 
 # -----------------------------------------------------
 # EKRANLAR
@@ -416,8 +424,6 @@ def show_register_window():
         height=BUTTON_HEIGHT
     ).pack(pady=(5, 15))
 
-
-
 def show_main_menu_welcome():
     clear_window()
 
@@ -482,7 +488,6 @@ def show_main_menu_welcome():
             font=("Cambria", 12, "bold"),  # Font ayarı
             width=15
         ).pack(pady=5)
-
 
 def show_level_selection():
     clear_window()
@@ -564,8 +569,6 @@ def draw_message_box(screen, message, submessage=None):
         sub = font_small.render(submessage, True, YELLOW)
         screen.blit(sub, sub.get_rect(center=(width/2, box_y + box_h*0.65)))
 
-
-# 1. Add this helper function near your other DB functions:
 def load_global_high_score(level):
     """Returns the highest score any user has achieved on this level."""
     conn = sqlite3.connect("game_data.db")
@@ -577,27 +580,15 @@ def load_global_high_score(level):
     row = c.fetchone()
     conn.close()
     return row[0] or 0
-
-
-def load_global_high_score(level):
-    """Returns the highest score any user has achieved on this level."""
-    conn = sqlite3.connect("game_data.db")
-    c = conn.cursor()
-    c.execute(
-        "SELECT MAX(score) FROM user_levels WHERE level_number=?",
-        (level,)
-    )
-    row = c.fetchone()
-    conn.close()
-    return row[0] or 0
-
 
 def start_game(selected_level):
     root.withdraw()
     pygame.init()
     SW, SH, OF = 750, 700, 50
+    icon = pygame.image.load("star_wars.ico")
+    pygame.display.set_icon(icon)
     screen = pygame.display.set_mode((SW + OF, SH + 2 * OF))
-    pygame.display.set_caption("Python Space Invaders")
+    pygame.display.set_caption("Star Wars")
     clock = pygame.time.Clock()
     font = pygame.font.Font("Font/monogram.ttf", 40)
 
@@ -659,7 +650,11 @@ def start_game(selected_level):
                         save_level_score(curr_user_id, selected_level, game.score)
                         save_coins_db(game.coins, curr_user_id)
                         pygame.quit()
-                        return start_game(selected_level + 1)
+                        if game.level < 10:
+                            return start_game(selected_level + 1)
+                        else:
+                            root.deiconify()
+                            show_main_menu_welcome()
                     else:
                         game.reset()
 
@@ -676,41 +671,28 @@ def start_game(selected_level):
             game.alien_lasers_group.update()
             game.mystery_ship_group.update()
             game.powerups_group.update()
-            game.update_powerup_status()
             game.check_for_collisions()
-            # Boss ve boss lazerlerini güncelle
+
+            # Mesaj zamanlayıcısını güncelle
+            if game.message_timer > 0:
+                game.message_timer -= 1000 / 60  # 60 FPS varsayımıyla
+
+        # Boss ve boss lazerlerini güncelle
         if game.boss_group and game.boss_group.sprite:
             boss = game.boss_group.sprite
             game.boss_group.update(game.boss_lasers_group, game.screen_width)
             game.boss_lasers_group.update()
 
-            # Boss çizimi
-            game.boss_group.draw(screen)
-            game.boss_lasers_group.draw(screen)
-
-            # Boss sağlık barı
-            bar_width = 200
-            bar_height = 20
-            bar_x = (SW + OF) // 2 - bar_width // 2
-            bar_y = 80
-
-            current_health = max(0, boss.health)
-            fill = int((current_health / boss.max_health) * bar_width)
-
-            pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # Kırmızı zemin
-            pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))  # Yeşil dolu kısım
-            pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)  # Beyaz kenarlık
-
         else:
-            game.boss_group.empty()  # Boss yoksa temizle
+            game.boss_group.empty()
             game.boss_lasers_group.empty()
 
-            # Can bitmişse oyun sonu (kaybetti)
+        # Can bitmişse oyun sonu
         if game.lives <= 0:
             game.run = False
             victory = False
 
-            # Boss yoksa VE uzaylılar yoksa => kazandı
+        # Boss yoksa VE uzaylılar yoksa => kazandı
         if not game.aliens_group and not game.boss_group:
             game.run = False
             victory = True
@@ -725,15 +707,20 @@ def start_game(selected_level):
             score_surf = font.render(f"SCORE: {game.score}", True, YELLOW)
             screen.blit(score_surf, (20, 20))
             # Coin
-            coin_surf  = font.render(f"COINS: {game.coins}", True, YELLOW)
-            screen.blit(coin_surf,  (20, 20 + score_surf.get_height() + 10))
+            coin_surf = font.render(f"COINS: {game.coins}", True, YELLOW)
+            screen.blit(coin_surf, (20, 20 + score_surf.get_height() + 10))
             # Health
             health_surf = font.render(f"HEALTH: {game.lives}", True, YELLOW)
-            screen.blit(health_surf, (20, 20 + 2 * (score_surf.get_height() + 10)))
+            screen.blit(health_surf, (20, 20 + 17.2 * (score_surf.get_height() + 10)))
             # Highscore
             high_surf = font.render(f"HIGH: {high_score}", True, YELLOW)
             hs_x = screen.get_width() - high_surf.get_width() - 60
             screen.blit(high_surf, (hs_x, 20))
+            # Level
+            level_surf = font.render(f"LEVEL {game.level}", True, YELLOW)
+            level_x = screen.get_width() - level_surf.get_width() - 30
+            level_y = screen.get_height() - level_surf.get_height() - 30
+            screen.blit(level_surf, (level_x, level_y))
 
             # Pause düğmesi
             pygame.draw.rect(screen, YELLOW, pause_rect)
@@ -751,23 +738,32 @@ def start_game(selected_level):
             game.alien_lasers_group.draw(screen)
             game.mystery_ship_group.draw(screen)
             game.powerups_group.draw(screen)
+
+            # Boss çizimi
             if game.boss_group.sprite:
-                game.boss_group.update(game.boss_lasers_group, SW + OF)
-            game.boss_group.draw(screen)
-            if game.boss_group.sprite:
+                game.boss_group.draw(screen)
+                game.boss_lasers_group.draw(screen)
                 boss = game.boss_group.sprite
                 bar_width = 200
                 bar_height = 20
                 bar_x = (SW + OF) // 2 - bar_width // 2
                 bar_y = 80
                 fill = int((boss.health / boss.max_health) * bar_width)
-                pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # Arka plan
-                pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))  # Doluluk
+                pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
+                pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))
+                pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
 
             if paused:
                 draw_message_box(screen,
                                  "PAUSED",
                                  "Press P to Resume or ESC to Exit")
+
+            # Mesaj çizimi (+1 Can)
+            if game.message and game.message_timer > 0:
+                message_font = pygame.font.Font("Font/monogram.ttf", 30)
+                message_surf = message_font.render(game.message, True, YELLOW)
+                message_rect = message_surf.get_rect(center=((SW + OF) / 2, SH - 50))
+                screen.blit(message_surf, message_rect)
 
         else:
             # Seviye bitiş ekranı
@@ -775,19 +771,31 @@ def start_game(selected_level):
             overlay.fill((0, 0, 0, 180))
             screen.blit(overlay, (0, 0))
             big = pygame.font.Font("Font/monogram.ttf", 60)
-            title = "LEVEL COMPLETE!" if victory else "GAME OVER"
+
+            # Başlık metni
+            if victory:
+                if game.level == 10:
+                    title = "VICTORY!"
+                else:
+                    title = "LEVEL COMPLETE!"
+            else:
+                title = "GAME OVER"
+
             color = (0, 255, 0) if victory else (255, 0, 0)
             msg = big.render(title, True, color)
-            screen.blit(msg,
-                        (SW // 2 - msg.get_width() // 2, SH // 2 - 60))
+            screen.blit(msg, (SW // 2 - msg.get_width() // 2, SH // 2 - 60))
 
+            # Butonlar
             b1 = pygame.Rect(SW // 2 - 100, SH // 2 + 20, 200, 40)
             b2 = pygame.Rect(SW // 2 - 100, SH // 2 + 80, 200, 40)
-            pygame.draw.rect(screen, YELLOW, b1)
-            pygame.draw.rect(screen, YELLOW, b2)
             sf = pygame.font.Font("Font/monogram.ttf", 40)
-            nl = "Next Level" if victory else "Play Again"
-            screen.blit(sf.render(nl, True, BLACK), (b1.x + 20, b1.y + 5))
+
+            if game.level != 10 or not victory:
+                pygame.draw.rect(screen, YELLOW, b1)
+                nl = "Next Level" if victory else "Play Again"
+                screen.blit(sf.render(nl, True, BLACK), (b1.x + 20, b1.y + 5))
+
+            pygame.draw.rect(screen, YELLOW, b2)
             screen.blit(sf.render("Exit", True, BLACK), (b2.x + 70, b2.y + 5))
 
         pygame.display.update()
@@ -978,7 +986,6 @@ def show_market():
         start_y += 180
     # ——————————————————
 
-
 def buy_gemi(ship_id, price, update_ui):
     """
     Satın alma işlemi.
@@ -1001,6 +1008,7 @@ def select_gemi(ship_id):
     equip_gemi(curr_user_id, ship_id)
     messagebox.showinfo("Selected","The ship was selected")
     show_market()
+
 def show_profile():
     clear_window()
     root.title("profilSayfası")
@@ -1082,7 +1090,6 @@ def show_profile():
     canvas.create_window(10, 10, anchor="nw", window=back_btn)
     # —————————————————
 
-
 def show_scoreboard():
     clear_window()
     root.title("SkorTablosu")
@@ -1100,8 +1107,6 @@ def show_scoreboard():
     # ——————————————————————————————————————
 
     # ——— Başlık ———
-    # Arkasına siyah bir kutucuk çizip üzerine sarı başlık yazıyoruz
-    #canvas.create_rectangle(150, 20, 550, 70, fill="black", outline="")
     canvas.create_text(
         350, 45,
         text="Scoreboard",
@@ -1131,7 +1136,6 @@ def show_scoreboard():
     )
     canvas.create_window(10, 10, anchor="nw", window=back_btn)
     # ——————————————————
-
 
 # -----------------------------------------------------
 # UYGULAMA BAŞLANGICI
@@ -1192,7 +1196,6 @@ def main():
             font=FONT_BUTTON,
             width=18
         ).pack(pady=PADDING)
-
 
 if __name__=="__main__":
     root = tk.Tk()

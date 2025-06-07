@@ -35,13 +35,30 @@ def update_coins_in_db(user_id, coins):
     conn.commit()
     conn.close()
 
-def update_score_in_db(user_id, score):
+def update_score_in_db(user_id, score, level):
     conn = sqlite3.connect("game_data.db")
     c = conn.cursor()
-    c.execute("INSERT INTO user_levels (user_id, score) VALUES (?, ?)", (user_id, score))
+
+    c.execute("""
+        SELECT score FROM user_levels WHERE user_id=? AND level_number=?
+    """, (user_id, level))
+    row = c.fetchone()
+
+    if row is None:
+        # İlk kez bu level oynanıyorsa, yeni kayıt
+        c.execute("""
+            INSERT INTO user_levels (user_id, level_number, score)
+            VALUES (?, ?, ?)
+        """, (user_id, level, score))
+    else:
+        # Daha yüksek skor varsa güncelle
+        if score > row[0]:
+            c.execute("""
+                UPDATE user_levels SET score=? WHERE user_id=? AND level_number=?
+            """, (score, user_id, level))
+
     conn.commit()
     conn.close()
-
 
 # -----------------------------------------------------
 # OYUN SINIFI
@@ -49,23 +66,29 @@ def update_score_in_db(user_id, score):
 class Game:
     def __init__(self, screen_width, screen_height, offset,
                  level=1, user_id=1, spaceship_image_path=None):
-        # temel ayarlar
-        self.muted = False
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.offset = offset
         self.level = level
         self.user_id = user_id
-        # Boss grubunu baştan oluştur
-        self.boss_group = pygame.sprite.GroupSingle()
-        if self.level >= 5:
-            from boss import Boss  # boss.py içinde tanımlı boss class'ı varsa
-            self.boss_group.add(Boss(self.screen_width // 2, 100, health=10))
-        self.boss_active = False
+        self.muted = False
+
         self.boss_group = pygame.sprite.GroupSingle()
         self.boss_lasers_group = pygame.sprite.Group()
 
-        # equip edilmiş geminin özelliklerini DB'den oku
+        self.boss_spawned = False
+        self.boss_active = False
+
+        # Mesaj sistemi için
+        self.message = None
+        self.message_timer = 0
+        self.message_duration = 2000  # 2 saniye
+
+        # alien'lar
+        self.aliens_group = pygame.sprite.Group()
+        self.create_aliens()
+
+        # equip geminin özelliklerini
         conn = sqlite3.connect("game_data.db")
         c = conn.cursor()
         c.execute("""
@@ -83,12 +106,7 @@ class Game:
             spaceship_image_path = spaceship_image_path or "Graphics/default_spaceship.png"
             ship_health, ship_shots = 3, 1
 
-        # Pygame ekran ve başlık
-        pygame.display.init()
-        self.screen = pygame.display.set_mode((screen_width + offset, screen_height + 2*offset))
-        pygame.display.set_caption("Python Space Invaders")
-
-        # Spaceship: health ve shots parametreleriyle
+        # Spaceship
         self.spaceship_group = pygame.sprite.GroupSingle(
             Spaceship(
                 screen_width, screen_height, offset,
@@ -98,10 +116,8 @@ class Game:
             )
         )
 
-        # can değerini geminin health'ine ayarla
         self.lives = ship_health
 
-        # diğer gruplar ve ayarlar
         self.obstacles = self.create_obstacles()
         self.aliens_group = pygame.sprite.Group()
         self.create_aliens()
@@ -118,22 +134,21 @@ class Game:
         pygame.mixer.music.load("Sounds/music.ogg")
         pygame.mixer.music.play(-1)
 
-        # power-up
         self.powerups_group = pygame.sprite.Group()
-        self.has_shield = False
-        self.has_double_shot = False
-        self.powerup_timer = 0
-        self.powerup_duration = 600
 
     def toggle_music(self):
-        if self.muted:
-            pygame.mixer.music.unpause()
-        else:
-            pygame.mixer.music.pause()
         self.muted = not self.muted
+        if self.muted:
+            pygame.mixer.music.pause()
+        else:
+            pygame.mixer.music.unpause()
+
+    def play_sound(self, sound):
+        if not self.muted:
+            sound.play()
 
     def update_screen(self):
-        self.screen.fill((50, 50, 50))
+        self.screen.fill((50, 50))
         pygame.draw.rect(self.screen, (243,216,63), (10,10,780,780), 2)
         pygame.draw.line(self.screen, (243,216,63), (25,730), (775,730), 3)
         self.boss_group.draw(self.screen)
@@ -141,27 +156,13 @@ class Game:
         for boss in self.boss_group:
             boss.draw_health_bar(self.screen)
 
-        # Boss varsa can barını göster
-        if self.boss_group.sprite:
-            boss = self.boss_group.sprite
-            bar_width = 200
-            bar_height = 20
-            bar_x = (self.screen_width + self.offset) // 2 - bar_width // 2
-            bar_y = 20
-            fill = int((boss.health / boss.max_health) * bar_width)
-            pygame.draw.rect(self.screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))  # Arka plan
-            pygame.draw.rect(self.screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))  # Doluluk
-
         if self.boss_active:
             self.update_boss()
 
         font = pygame.font.Font("Font/monogram.ttf", 40)
-        # Seviye
         self.screen.blit(font.render(f"LEVEL {self.level}", True, (243,216,63)), (570,740))
-        # Mute butonu
-        self.create_mute_button()
+        self.create_mute_sprite()
 
-        # Sprite grupları
         self.spaceship_group.draw(self.screen)
         self.spaceship_group.sprite.lasers_group.draw(self.screen)
         for obs in self.obstacles:
@@ -171,8 +172,6 @@ class Game:
         self.mystery_ship_group.draw(self.screen)
         self.powerups_group.draw(self.screen)
 
-
-        # Score / Highscore / Coins / Health
         self.screen.blit(font.render(str(self.score).zfill(5), False, (243,216,63)), (50,40))
         self.screen.blit(font.render(str(self.highscore).zfill(5), False, (243,216,63)), (550,40))
         self.screen.blit(font.render(f"Coins: {self.coins}", True, (243,216,63)), (50,80))
@@ -187,8 +186,6 @@ class Game:
         icon_img = pygame.image.load(f"Graphics/{icon}.png")
         icon_img = pygame.transform.scale(icon_img, (40,40))
         self.screen.blit(icon_img, rect)
-        if pygame.mouse.get_pressed()[0] and rect.collidepoint(pygame.mouse.get_pos()):
-            self.toggle_music()
 
     def create_obstacles(self):
         w = len(grid[0]) * 3
@@ -200,14 +197,14 @@ class Game:
         return obs
 
     def create_aliens(self):
-        rows = min(self.level, 10)
+        rows = 9 if self.level >= 9 else min(self.level, 10)
         cols = 11
         for row in range(rows):
             for col in range(cols):
-                x = 75 + col*55
-                y = 110 + row*55
-                t = 3 if row==0 else 2 if row==1 else 1
-                self.aliens_group.add(Alien(t, x+self.offset/2, y))
+                x = 75 + col * 55
+                y = 110 + row * 55
+                t = 3 if row == 0 else 2 if row == 1 else 1
+                self.aliens_group.add(Alien(t, x + self.offset / 2, y))
 
     def update_boss(self):
         if not self.boss_group.sprite:
@@ -215,15 +212,6 @@ class Game:
 
         boss = self.boss_group.sprite
         boss.update(self.boss_lasers_group, self.screen_width + self.offset)
-
-        # Boss can barı
-        bar_width = 200
-        bar_height = 20
-        bar_x = (self.screen_width + self.offset) // 2 - bar_width // 2
-        bar_y = 20
-        fill = int((boss.health / boss.max_health) * bar_width)
-        pygame.draw.rect(self.screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
-        pygame.draw.rect(self.screen, (0, 255, 0), (bar_x, bar_y, fill, bar_height))
 
     def move_aliens(self):
         self.aliens_group.update(self.aliens_direction)
@@ -242,23 +230,19 @@ class Game:
     def alien_shoot_laser(self):
         if self.aliens_group:
             shooter = random.choice(self.aliens_group.sprites())
-            # Aşağıdan yukarıya atacak şekilde speed pozitif
             self.alien_lasers_group.add(Laser(shooter.rect.center, -6, self.screen_height))
 
     def create_mystery_ship(self):
         self.mystery_ship_group.add(MysteryShip(self.screen_width, self.offset))
 
     def create_powerup(self):
-        pt = random.choice(["shield","double_shot"])
-        self.powerups_group.add(PowerUp(self.screen_width, self.screen_height, self.offset, pt))
+        self.powerups_group.add(PowerUp(self.screen_width, self.screen_height, self.offset, "life"))
 
     def check_for_collisions(self):
-        # Oyuncu lazerleri vs uzaylılar
         for laser in self.spaceship_group.sprite.lasers_group.copy():
-            # Uzaylıya çarparsa
             hits = pygame.sprite.spritecollide(laser, self.aliens_group, True)
             if hits:
-                self.explosion_sound.play()
+                self.play_sound(self.explosion_sound)
                 for a in hits:
                     self.score += a.type * 20
                     self.check_for_highscore()
@@ -266,7 +250,6 @@ class Game:
                     update_coins_in_db(self.user_id, self.coins)
                 laser.kill()
 
-            # Boss'a çarparsa
             if pygame.sprite.spritecollide(laser, self.boss_group, False):
                 laser.kill()
                 boss = self.boss_group.sprite
@@ -276,115 +259,90 @@ class Game:
                     self.coins += 50
                     update_coins_in_db(self.user_id, self.coins)
                     self.boss_group.empty()
-                    self.explosion_sound.play()
+                    self.play_sound(self.explosion_sound)
 
-            # Gizemli gemiye çarparsa
             if pygame.sprite.spritecollide(laser, self.mystery_ship_group, True):
                 self.score += 100
-                self.explosion_sound.play()
+                self.play_sound(self.explosion_sound)
                 self.check_for_highscore()
                 self.coins += 50
                 update_coins_in_db(self.user_id, self.coins)
                 laser.kill()
 
-            # Power-up'a çarparsa
             for pu in pygame.sprite.spritecollide(laser, self.powerups_group, True):
                 laser.kill()
-                if pu.power_type == "shield":
-                    self.has_shield = True
-                    self.powerup_timer = self.powerup_duration
-                else:
-                    self.has_double_shot = True
-                    self.powerup_timer = self.powerup_duration
+                if pu.power_type == "life":
+                    if self.lives < self.spaceship_group.sprite.health:
+                        self.lives += 1
+                        self.message = "+1 Health"
+                        self.message_timer = self.message_duration
 
-            # Engel'e çarparsa
             for obs in self.obstacles:
                 if pygame.sprite.spritecollide(laser, obs.blocks_group, True):
                     laser.kill()
                     break
 
-        # Uzaylı lazerleri vs oyuncu
         for laser in self.alien_lasers_group.copy():
             if pygame.sprite.spritecollide(laser, self.spaceship_group, False):
                 laser.kill()
-                if not self.has_shield:
-                    self.lives -= 1
-                    if self.lives <= 0:
-                        self.game_over()
-                else:
-                    self.has_shield = False
-                    self.powerup_timer = 0
+                self.lives -= 1
+                if self.lives <= 0:
+                    self.game_over()
             for obs in self.obstacles:
                 if pygame.sprite.spritecollide(laser, obs.blocks_group, True):
                     laser.kill()
                     break
 
-        # Boss lazerleri vs oyuncu ve engeller
         for laser in self.boss_lasers_group.copy():
             if pygame.sprite.spritecollide(laser, self.spaceship_group, False):
                 laser.kill()
-                if not self.has_shield:
-                    self.lives -= 1
-                    if self.lives <= 0:
-                        self.game_over()
-                else:
-                    self.has_shield = False
-                    self.powerup_timer = 0
+                self.lives -= 1
+                if self.lives <= 0:
+                    self.game_over()
             for obs in self.obstacles:
                 if pygame.sprite.spritecollide(laser, obs.blocks_group, True):
                     laser.kill()
                     break
 
-        # Uzaylılar vs engel/oyuncu
         for alien in self.aliens_group.copy():
             for obs in self.obstacles:
                 pygame.sprite.spritecollide(alien, obs.blocks_group, True)
             if pygame.sprite.spritecollide(alien, self.spaceship_group, False):
-                if not self.has_shield:
-                    self.lives -= 1
-                    if self.lives <= 0:
-                        self.game_over()
-                else:
-                    self.has_shield = False
-                    self.powerup_timer = 0
+                self.lives -= 1
+                if self.lives <= 0:
+                    self.game_over()
                 alien.kill()
 
-        # Seviye tamamlandı mı kontrol et
         self.check_for_level_completion()
 
     def check_for_level_completion(self):
-        if self.level == 5:
-            # Eğer alien'lar bitti ama boss henüz gelmediyse boss oluştur
-            if not self.aliens_group and not self.boss_group:
-                if not hasattr(self, 'boss_spawned') or not self.boss_spawned:
-                    from boss import Boss
-                    self.boss_group.add(Boss(self.screen_width // 2, 100, health=10))
-                    self.boss_spawned = True  # boss artık sahnede
+        if self.level in [5, 10]:
+            if not self.boss_spawned and not self.aliens_group:
+                self.boss_group.empty()
+                boss_x = self.screen_width // 2
+                boss_y = 100
+                self.boss_group.add(Boss(boss_x, boss_y, health=10, level=self.level))
+                self.boss_spawned = True
+                self.boss_active = True
 
-            # boss sahneye gelmişti ama şimdi yoksa: level tamamlanmış
-            elif not self.boss_group and getattr(self, 'boss_spawned', False):
+            elif self.boss_spawned and self.boss_group:
+                pass
+
+            elif self.boss_spawned and not self.boss_group:
                 self.run = False
                 self.victory = True
+
         else:
-            # 1–4 ve 6–10. seviyelerde sadece uzaylılara göre karar ver
             if not self.aliens_group:
                 self.run = False
                 self.victory = True
 
-    def update_powerup_status(self):
-        if self.powerup_timer > 0:
-            self.powerup_timer -= 1
-        else:
-            self.has_shield = False
-            self.has_double_shot = False
-
     def game_over(self):
         self.run = False
-        update_score_in_db(self.user_id, self.score)
+        update_score_in_db(self.user_id, self.score, self.level)
 
     def reset(self):
         self.run = True
-        # Canı tekrar geminin max health'ine ayarla
         self.lives = self.spaceship_group.sprite.health
         self.spaceship_group.sprite.reset()
         self.aliens_group.empty()
@@ -394,9 +352,10 @@ class Game:
         self.mystery_ship_group.empty()
         self.obstacles = self.create_obstacles()
         self.score = 0
-        self.has_shield = False
-        self.has_double_shot = False
-        self.powerup_timer = 0
+        self.boss_group.empty()
+        self.boss_lasers_group.empty()
+        self.boss_spawned = False
+        self.boss_active = False
 
     def next_level(self):
         self.level += 1
@@ -410,12 +369,19 @@ class Game:
         self.mystery_ship_group.empty()
         self.powerups_group.empty()
         self.obstacles = self.create_obstacles()
-        self.create_aliens()
+
+        if self.level not in [5, 10]:
+            self.create_aliens()
+
+        self.boss_group.empty()
+        self.boss_lasers_group.empty()
+        self.boss_spawned = False
+        self.boss_active = False
 
     def check_for_highscore(self):
         if self.score > self.highscore:
             self.highscore = self.score
-            update_score_in_db(self.user_id, self.score)
+            update_score_in_db(self.user_id, self.score, self.level)
 
     def load_highscore(self):
         self.highscore = load_highscore_from_db(self.user_id)
